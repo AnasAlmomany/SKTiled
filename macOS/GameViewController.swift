@@ -155,7 +155,7 @@ class GameViewController: NSViewController {
 
      - parameter withFile: `String` currently loaded scene name.
      */
-    func updateWindowTitle(notification: Notification) {
+    @objc func updateWindowTitle(notification: Notification) {
         if let wintitle = notification.userInfo!["wintitle"] {
             if let infoDictionary = Bundle.main.infoDictionary {
                 if let bundleName = infoDictionary[kCFBundleNameKey as String] as? String {
@@ -170,7 +170,7 @@ class GameViewController: NSViewController {
 
      - parameter notification: `Notification` notification.
      */
-    func updateDebugLabels(notification: Notification) {
+    @objc func updateDebugLabels(notification: Notification) {
         if let mapInfo = notification.userInfo!["mapInfo"] {
             mapInfoLabel.stringValue = mapInfo as! String
         }
@@ -192,7 +192,7 @@ class GameViewController: NSViewController {
         }
     }
 
-    func updateGraphControls(notification: Notification) {
+    @objc func updateGraphControls(notification: Notification) {
         if let hasGraphs = notification.userInfo!["hasGraphs"] {
             graphButton.isEnabled = (hasGraphs as? Bool) == true
         }

@@ -126,7 +126,7 @@ open class DemoController: NSObject {
      
      - parameter interval: `TimeInterval` transition duration.
      */
-    open func reloadScene(_ interval: TimeInterval=0.4) {
+    @objc open func reloadScene(_ interval: TimeInterval=0.4) {
         guard let currentURL = currentURL else { return }
         loadScene(url: currentURL, usePreviousCamera: true, interval: interval)
     }
@@ -136,7 +136,7 @@ open class DemoController: NSObject {
      
      - parameter interval: `TimeInterval` transition duration.
      */
-    open func loadNextScene(_ interval: TimeInterval=0.4) {
+    @objc open func loadNextScene(_ interval: TimeInterval=0.4) {
         guard let currentURL = currentURL else { return }
         var nextFilename = demourls.first!
         if let index = demourls.index(of: currentURL), index + 1 < demourls.count {
@@ -150,7 +150,7 @@ open class DemoController: NSObject {
      
      - parameter interval: `TimeInterval` transition duration.
      */
-    open func loadPreviousScene(_ interval: TimeInterval=0.4) {
+    @objc open func loadPreviousScene(_ interval: TimeInterval=0.4) {
         guard let currentURL = currentURL else { return }
         var nextFilename = demourls.last!
         if let index = demourls.index(of:currentURL), index > 0, index - 1 < demourls.count {

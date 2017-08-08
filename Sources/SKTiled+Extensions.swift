@@ -54,7 +54,7 @@ public func imageOfSize(_ size: CGSize, scale: CGFloat=1, _ whatToDraw: (_ conte
     let scaledSize = size
     let image = NSImage(size: scaledSize)
     image.lockFocus()
-    let nsContext = NSGraphicsContext.current()!
+    let nsContext = NSGraphicsContext.current!
     nsContext.imageInterpolation = .high
     let context = nsContext.cgContext
     let bounds = CGRect(origin: CGPoint.zero, size: size)
@@ -105,13 +105,13 @@ public func duration(_ block: () -> ()) -> TimeInterval {
 // MARK: - Extensions
 
 extension Bool {
-    init<T : Integer>(_ integer: T) {
+    init<T : BinaryInteger>(_ integer: T) {
         self.init(integer != 0)
     }
 }
 
 
-extension Integer {
+extension BinaryInteger {
     init(_ bool: Bool) {
         self = bool ? 1 : 0
     }
@@ -1484,7 +1484,7 @@ public func getContentScaleFactor() -> CGFloat {
     #if os(iOS) || os(tvOS)
     return UIScreen.main.scale
     #else
-    return NSScreen.main()!.backingScaleFactor
+    return NSScreen.main!.backingScaleFactor
     #endif
 }
 

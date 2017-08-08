@@ -172,7 +172,7 @@ public extension TiledLayerObject {
     /**
      Parse the layer's properties value.
      */
-    public func parseProperties(completion: (() -> ())?) {
+    @objc public func parseProperties(completion: (() -> ())?) {
 
         if (ignoreProperties == true) { return }
         if (self.type == nil) { self.type = properties.removeValue(forKey: "type") }

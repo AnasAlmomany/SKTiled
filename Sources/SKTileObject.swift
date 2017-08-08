@@ -527,41 +527,41 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
 
             // text block attributes
             textStyle.alignment = NSTextAlignment(rawValue: textAttributes.alignment.horizontal.intValue)!
-            let textFontAttributes: [String : Any] = [
-                    NSFontAttributeName: textAttributes.font,
-                    NSForegroundColorAttributeName: textAttributes.fontColor,
-                    NSParagraphStyleAttributeName: textStyle,
+            let textFontAttributes: [NSAttributedStringKey : Any] = [
+                    NSAttributedStringKey.font: textAttributes.font,
+                    NSAttributedStringKey.foregroundColor: textAttributes.fontColor,
+                    NSAttributedStringKey.paragraphStyle: textStyle,
                     ]
 
             // TODO: vertical alignment is slightly off from Tiled, NSStringDrawingContext needs 10.11
             // setup vertical alignment
             let fontHeight: CGFloat
             #if os(iOS) || os(tvOS)
-            fontHeight = self.text!.boundingRect(with: CGSize(width: bounds.width, height: CGFloat.infinity), options: .usesLineFragmentOrigin, attributes: textFontAttributes, context: nil).height
+            fontHeight = self.text!.boundingRect(with: CGSize(width: bounds.width, height: CGFloat.infinity), options: .usesLineFragmentOrigin, attributes: textFontAttributes as [String : Any], context: nil).height
             #else
-            fontHeight = self.text!.boundingRect(with: CGSize(width: bounds.width, height: CGFloat.infinity), options: .usesLineFragmentOrigin, attributes: textFontAttributes).height
+            fontHeight = self.text!.boundingRect(with: CGSize(width: bounds.width, height: CGFloat.infinity), options: NSString.DrawingOptions.usesLineFragmentOrigin, attributes: textFontAttributes).height
             #endif
             // vertical alignment
             // center aligned...
             if (textAttributes.alignment.vertical == .center) {
                 let adjustedRect: CGRect = CGRect(x: scaledRect.minX, y: scaledRect.minY + (scaledRect.height - fontHeight) / 2, width: scaledRect.width, height: fontHeight)
                 #if os(macOS)
-                NSRectClip(textRect)
+                textRect.clip()
                 #endif
-                self.text!.draw(in: adjustedRect.offsetBy(dx: 0, dy: 2 * withScale), withAttributes: textFontAttributes)
+                self.text!.draw(in: adjustedRect.offsetBy(dx: 0, dy: 2 * withScale), withAttributes: textFontAttributes as [String : Any])
 
             // top aligned...
             } else if (textAttributes.alignment.vertical == .top) {
-                self.text!.draw(in: bounds, withAttributes: textFontAttributes)
+                self.text!.draw(in: bounds, withAttributes: textFontAttributes as [String : Any])
                 //self.text!.draw(in: bounds.offsetBy(dx: 0, dy: 1.25 * withScale), withAttributes: textFontAttributes)
 
             // bottom aligned
             } else {
                 let adjustedRect: CGRect = CGRect(x: scaledRect.minX, y: scaledRect.minY, width: scaledRect.width, height: fontHeight)
                 #if os(macOS)
-                NSRectClip(textRect)
+                textRect.clip()
                 #endif
-                self.text!.draw(in: adjustedRect.offsetBy(dx: 0, dy: 2 * withScale), withAttributes: textFontAttributes)
+                self.text!.draw(in: adjustedRect.offsetBy(dx: 0, dy: 2 * withScale), withAttributes: textFontAttributes as [String : Any])
             }
             context.restoreGState()
         }

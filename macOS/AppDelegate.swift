@@ -26,7 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     var viewController: GameViewController? {
-        if let window = NSApplication.shared().mainWindow {
+        if let window = NSApplication.shared.mainWindow {
             if let controller = window.contentViewController as? GameViewController {
                 return controller
             }
@@ -43,7 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         dialog.title = "Choose a Tiled resource."
         dialog.allowedFileTypes = ["tmx"]
         
-        if (dialog.runModal() == NSModalResponseOK) {
+        if (dialog.runModal() == NSApplication.ModalResponse.OK) {
             
             // tmx file path
             let result = dialog.url

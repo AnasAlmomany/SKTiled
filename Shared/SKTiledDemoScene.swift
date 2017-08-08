@@ -188,7 +188,7 @@ public class SKTiledDemoScene: SKTiledScene {
     /**
      Callback to remove coordinates.
      */
-    public func updateCoordinate(notification: Notification) {
+    @objc public func updateCoordinate(notification: Notification) {
         let tempCoord = CGPoint(x: notification.userInfo!["x"] as! Int,
                                 y: notification.userInfo!["y"] as! Int)
         
@@ -425,7 +425,7 @@ extension SKTiledDemoScene {
     */
     open func updateTrackingViews(){
         if let view = self.view {
-            let options = [NSTrackingAreaOptions.mouseMoved, NSTrackingAreaOptions.activeAlways] as NSTrackingAreaOptions
+            let options = [NSTrackingArea.Options.mouseMoved, NSTrackingArea.Options.activeAlways] as NSTrackingArea.Options
             // clear out old tracking areas
             for oldTrackingArea in view.trackingAreas {
                 view.removeTrackingArea(oldTrackingArea)

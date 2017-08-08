@@ -580,10 +580,20 @@ public func flipFlagsDebug(hflip: Bool, vflip: Bool, dflip: Bool) -> String {
     return result
 }
 
-
+// TODO: this appears to be a bug
+/*
 public extension SignedInteger {
-    public var hexString: String { return "0x" + String(self, radix: 16) }
-    public var binaryString: String { return "0b" + String(self, radix: 2) }
+    public var hexString: String {
+        
+        let intVal = Int(truncatingIfNeeded: self)
+        let hex: String = String(intVal, radix: 16)
+        let str2: String = "#" + hex.characters
+        return "0x" + str2
+    }
+    
+    public var binaryString: String {
+        return "0b" + self.format(radix: 2)
+    }
 }
 
 
@@ -591,7 +601,7 @@ public extension UnsignedInteger {
     public var hexString: String { return "0x" + String(self, radix: 16) }
     public var binaryString: String { return "0b" + String(self, radix: 2) }
 }
-
+*/
 
 #if os(iOS) || os(tvOS)
 public extension UIFont {
@@ -608,7 +618,7 @@ public extension UIFont {
 #else
 public extension NSFont {
     public static func allFontNames() {
-        let fm = NSFontManager.shared()
+        let fm = NSFontManager.shared
         for family in fm.availableFonts {
             print("\(family)")
         }
