@@ -18,6 +18,4 @@ Pod::Spec.new do |s|
   s.source_files          = 'Sources/*.swift'
   s.requires_arc          = true
   s.library               = 'z'
-  s.preserve_path         = 'zlib/*'
-  s.pod_target_xcconfig   =  { 'SWIFT_INCLUDE_PATHS' => '$(PODS_ROOT)/SKTiled/zlib' }
 end

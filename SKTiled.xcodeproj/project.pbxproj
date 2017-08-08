@@ -113,8 +113,6 @@
 		4C88E1E71D8A4EBE00FCCFA3 /* SKTileObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C88E1D91D8A4EBE00FCCFA3 /* SKTileObject.swift */; };
 		4C88E1E81D8A4EBE00FCCFA3 /* SKTileset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C88E1DA1D8A4EBE00FCCFA3 /* SKTileset.swift */; };
 		4C88E1EA1D8A4EBE00FCCFA3 /* SKTilesetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C88E1DC1D8A4EBE00FCCFA3 /* SKTilesetData.swift */; };
-		4C8E42E01DC26FD1002C76DA /* zlib in Resources */ = {isa = PBXBuildFile; fileRef = 4C8E42DF1DC26FD1002C76DA /* zlib */; };
-		4C8E42E11DC26FD1002C76DA /* zlib in Resources */ = {isa = PBXBuildFile; fileRef = 4C8E42DF1DC26FD1002C76DA /* zlib */; };
 		4CA22C7E1F040FF600CD0A72 /* Nintendo-Arcade.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4CA22C7C1F040FF600CD0A72 /* Nintendo-Arcade.ttf */; };
 		4CA6E5341F393F6D00612A1C /* barrels-12x10 in Resources */ = {isa = PBXBuildFile; fileRef = 4CA6E52F1F393F6D00612A1C /* barrels-12x10 */; };
 		4CA6E5351F393F6D00612A1C /* barrels-12x10 in Resources */ = {isa = PBXBuildFile; fileRef = 4CA6E52F1F393F6D00612A1C /* barrels-12x10 */; };
@@ -262,7 +260,6 @@
 		4C88E1D91D8A4EBE00FCCFA3 /* SKTileObject.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SKTileObject.swift; sourceTree = "<group>"; };
 		4C88E1DA1D8A4EBE00FCCFA3 /* SKTileset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SKTileset.swift; sourceTree = "<group>"; };
 		4C88E1DC1D8A4EBE00FCCFA3 /* SKTilesetData.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SKTilesetData.swift; sourceTree = "<group>"; };
-		4C8E42DF1DC26FD1002C76DA /* zlib */ = {isa = PBXFileReference; lastKnownFileType = folder; path = zlib; sourceTree = SOURCE_ROOT; };
 		4CA22C7C1F040FF600CD0A72 /* Nintendo-Arcade.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Nintendo-Arcade.ttf"; sourceTree = "<group>"; };
 		4CA6E52F1F393F6D00612A1C /* barrels-12x10 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "barrels-12x10"; path = "../../test/Assets/barrels-12x10"; sourceTree = "<group>"; };
 		4CA6E5301F393F6D00612A1C /* characters-16x16 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "characters-16x16"; path = "../../test/Assets/characters-16x16"; sourceTree = "<group>"; };
@@ -428,7 +425,6 @@
 			isa = PBXGroup;
 			children = (
 				4C0E59511DC053CA00921F75 /* Libraries */,
-				4C8E42DF1DC26FD1002C76DA /* zlib */,
 			);
 			name = Modules;
 			path = Sources;
@@ -747,7 +743,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4C8E42E11DC26FD1002C76DA /* zlib in Resources */,
 				4C6FB8A91F1E5D2800A57964 /* pm-maze-8x8.tsx in Resources */,
 				4C6FB8AB1F1E5D2800A57964 /* pm-maze-8x8.png in Resources */,
 				4CA6E5361F393F6D00612A1C /* characters-16x16 in Resources */,
@@ -826,7 +821,6 @@
 				4CBA61831D8A0A4600B31FC1 /* roguelike-16x16-anim.png in Resources */,
 				4C88E1AB1D8A241F00FCCFA3 /* ortho4-16x16.tmx in Resources */,
 				4C0924F21F127DC0009CA37E /* tetris-layer4-336x240.png in Resources */,
-				4C8E42E01DC26FD1002C76DA /* zlib in Resources */,
 				4C0924DC1F127DC0009CA37E /* tetris-square-8x8.tsx in Resources */,
 				4C0924E41F127DC0009CA37E /* lshape-24x16.png in Resources */,
 				4C6FB8A81F1E5D2800A57964 /* pacman-8x8.tmx in Resources */,
@@ -1181,7 +1175,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = "-lz";
 				SDKROOT = iphoneos;
 				SWIFT_INCLUDE_PATHS = zlib;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -1223,7 +1217,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = "-lz";
 				SDKROOT = iphoneos;
 				SWIFT_INCLUDE_PATHS = zlib;
 				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
@@ -1285,6 +1279,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				MODULEMAP_FILE = macOS/framework/SKTiled.modulemap;
+				OTHER_LDFLAGS = "-lz";
 				PRODUCT_BUNDLE_IDENTIFIER = com.supermeerkat.SKTiled;
 				PRODUCT_NAME = SKTiled;
 				SDKROOT = macosx;
@@ -1315,6 +1310,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				MODULEMAP_FILE = macOS/framework/SKTiled.modulemap;
+				OTHER_LDFLAGS = "-lz";
 				PRODUCT_BUNDLE_IDENTIFIER = com.supermeerkat.SKTiled;
 				PRODUCT_NAME = SKTiled;
 				SDKROOT = macosx;
