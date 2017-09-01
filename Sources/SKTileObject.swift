@@ -8,68 +8,59 @@
 
 import SpriteKit
 
-/**
- Describes the `SKTileObject` shape type.
-
- - rectangle:  rectangular shape
- - ellipse:    circular shape
- - polygon:    closed polygon
- - polyline:   open polygon
- */
-public enum SKObjectType: String {
-    case rectangle
-    case ellipse
-    case polygon
-    case polyline
-}
-
 
 /**
- Represents the object's physics body type.
 
- - `none`:      object has no physics properties.
- - `dynamic`:   object is an active physics body.
- - `collision`: object is a passive physics body.
- */
-public enum CollisionType {
-    case none
-    case dynamic
-    case collision
-}
+ ## Overview ##
+
+ Structure for managing basic font rendering attributes for [text objects][text-objects].
 
 
-/**
- Label description orientation.
+ ### Properties ###
 
- - `above`: labels are rendered above the object.
- - `below`: labels are rendered below the object.
- */
-internal enum LabelPosition {
-    case above
-    case below
-}
+ 
+ ```swift
+ TextObjectAttributes.fontName        // font name.
+ TextObjectAttributes.fontSize        // font size.
+ TextObjectAttributes.fontColor       // font color.
+ TextObjectAttributes.alignment       // horizontal/vertical alignment.
+ TextObjectAttributes.wrap            // wrap text.
+ TextObjectAttributes.isBold          // font is bold.
+ TextObjectAttributes.isItalic        // font is italicized.
+ TextObjectAttributes.isUnderline     // font is underlined.
+ TextObjectAttributes.renderQuality   // font resolution.
+ ```
 
-
-/**
- Text object font rendering attributes.
-
- - parameter fontName:      `String` font name.
- - parameter fontSize:      `CGFloat` font size.
- - parameter fontColor:     `SKColor` font color.
- - parameter alignment:     `TextAlignment` horizontal/vertical alignment.
- - parameter wrap:          `Bool` wrap text.
- - parameter isBold:        `Bool`
- - parameter isItalic:      `Bool`
- - parameter isUnderline:   `Bool`
- - parameter renderQuality: `CGFloat` font resolution.
+ [text-objects]:../objects.html#text-objects
  */
 public struct TextObjectAttributes {
 
+    /// Font name.
     public var fontName: String = "Arial"
+    /// Font size.
     public var fontSize: CGFloat = 16
+    /// Font color.
     public var fontColor: SKColor = .black
+    /// Font alignment.
+    public struct TextAlignment {
+        var horizontal: HoriztonalAlignment = .left
+        var vertical: VerticalAlignment = .top
 
-    /// Text alignment
+        enum HoriztonalAlignment: String {
+            case left
+            case center
+            case right
+        }
+
+        enum VerticalAlignment: String {
+            case top
+            case center
+            case bottom
+        }
+    }
+
+
+    /// Text alignment.
     public var alignment: TextAlignment = TextAlignment()
 
     public var wrap: Bool = true
@@ -77,69 +68,78 @@ public struct TextObjectAttributes {
     public var isItalic: Bool = false
     public var isUnderline: Bool = false
     public var isStrikeout: Bool = false
+    /// Font scaling property.
     public var renderQuality: CGFloat = 8
 
     public init() {}
 
+    /**
+     Initialize with basic font attributes.
+     */
     public init(font: String, size: CGFloat, color: SKColor = .black) {
         fontName = font
         fontSize = size
         fontColor = color
     }
-
-    /**
-     Data structure representing text horizontal & vertical alignment.
-     */
-    public struct TextAlignment {
-
-        public var horizontal: HoriztonalAlignment = .left
-        public var vertical: VerticalAlignment = .top
-
-        public enum HoriztonalAlignment: String {
-            case left
-            case center
-            case right
-        }
-
-        public enum VerticalAlignment: String {
-            case top
-            case center
-            case bottom
-        }
-    }
 }
 
 /**
- The `SKTileObject` object represents a Tiled object type (rectangle, ellipse, polygon & polyline).
+ ## Overview ##
 
- When the object is created, points can be added either with an array of `CGPoint` objects, or a string. In order to render the object, the `SKTileObject.getVertices()` method is called, which returns the points that make up the shape.
+ The `SKTileObject` class represents a Tiled vector object type (rectangle, ellipse, polygon & polyline). When the object is created, points can be added either with an array of `CGPoint` objects, or a string. In order to render the object, the `SKTileObject.getVertices()` method is called, which returns the points needed to draw the path.
+
  */
-open class SKTileObject: SKShapeNode, SKTiledObject {
-    /// Object parent layer
+open class SKTileObject: SKShapeNode, SKTiledObject, Loggable {
+
+    // Describes the object shape.
+    public enum ObjectType: String {
+        case rectangle
+        case ellipse
+        case polygon
+        case polyline
+    }
+
+    /// Object parent layer.
     weak open var layer: SKObjectGroup!
-    /// Object unique id
-    open var uuid: String = UUID().uuidString               // unique id
-    /// Tiled object id
+    /// Unique id (layer & object names may not be unique).
+    open var uuid: String = UUID().uuidString
+    /// Tiled object id.
     open var id: Int = 0
-    /// Tiled global id (for tile objects)
-    open var gid: Int!
-    /// Object type
+    /// Tiled global id (for tile objects).
+    internal var gid: Int!
+    /// Object type.
     open var type: String!
-
-    internal var alignment: Alignment = .bottomLeft         // object alignment
-    internal var objectType: SKObjectType = .rectangle      // shape type
-    internal var points: [CGPoint] = []                     // points that describe the object's shape
-    internal var tile: SKTile? = nil                        // optional tile
-
-
+    
+    /// Object size.
     open var size: CGSize = CGSize.zero
-    /// Custom object properties
+    
+    internal var objectType: ObjectType = .rectangle        // shape type
+    internal var points: [CGPoint] = []                     // points that describe the object's shape
+    internal var tile: SKTile?                              // optional tile
+    /// Object bounds color.
+    open var frameColor: SKColor = TiledObjectColors.magenta
+    internal var boundsKey: String = "BOUNDS"
+    
+    /**
+     ## Overview ##
+
+     Enum defining object collision type.
+     */
+    public enum CollisionType {
+        case none
+        case dynamic
+        case collision
+    }
+
+    /// Custom object properties.
     open var properties: [String: String] = [:]
     open var ignoreProperties: Bool = false                 // ignore custom properties
-    internal var physicsType: CollisionType = .none         // physics collision type
+    /// Physics collision type.
+    open var physicsType: CollisionType = .none
 
     /// Text formatting attributes (for text objects)
     open var textAttributes: TextObjectAttributes!
+
 
     ///Text object render quality.
     open var renderQuality: CGFloat = 8 {
@@ -154,7 +154,13 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
         }
     }
 
-    /// Text string (for text objects)
+    /// Object label.
+    internal enum LabelPosition {
+        case above
+        case below
+    }
+
+    /// Text string (for text objects). Setting this attribute will redraw the object automatically.
     open var text: String! {
         didSet {
             guard text != oldValue else { return }
@@ -162,28 +168,8 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
         }
     }
 
-    /// Object opacity
-    open var opacity: CGFloat {
-        get {
-            return self.alpha
-        }
-        set {
-            self.alpha = newValue
-        }
-    }
-
-    /// Object visibility
-    open var visible: Bool {
-        get {
-            return !self.isHidden
-        }
-        set {
-            self.isHidden = !newValue
-        }
-    }
-
     /// Returns the bounding box of the shape.
-    open var boundingRect: CGRect {
+    open var bounds: CGRect {
         return CGRect(x: 0, y: 0, width: size.width, height: -size.height)
     }
 
@@ -196,7 +182,7 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
             let tileAlignmentY = layer.tilemap.tileHeightHalf
             return CGPoint(x: tileAlignmentX, y: tileAlignmentY)
         }
-        return boundingRect.center
+        return bounds.center
     }
 
     /// Signifies that this object is a text or tile object.
@@ -213,11 +199,11 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
     /**
      Initialize the object with width & height attributes.
 
-     - parameter width:  `CGFloat` object size width.
-     - parameter height: `CGFloat` object size height.
-     - parameter type:   `SKObjectType` object shape type.
+     - parameter width:  `CGFloat`      object size width.
+     - parameter height: `CGFloat`      object size height.
+     - parameter type:   `ObjectType`   object shape type.
      */
-    public init(width: CGFloat, height: CGFloat, type: SKObjectType = .rectangle){
+    required public init(width: CGFloat, height: CGFloat, type: ObjectType = .rectangle) {
         super.init()
 
         // Rectangular and ellipse objects get initial points.
@@ -234,7 +220,7 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
         drawObject()
     }
 
-    public init?(attributes: [String: String]) {
+    required public init?(attributes: [String: String]) {
         // required attributes
         guard let objectID = attributes["id"],
                 let xcoord = attributes["x"],
@@ -296,15 +282,13 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
     }
 
     /**
-     Initialize the object with tile gid & object group.
+     Initialize the object with an object group reference.
 
-     - parameter tileID: `Int` tile id.
      - parameter layer:  `SKObjectGroup` object group.
      */
-    public init(gid: Int, layer: SKObjectGroup){
+    required public init(layer: SKObjectGroup) {
         super.init()
-        self.gid = gid
-        self.layer = layer
+        _ = layer.addObject(self)
         drawObject()
     }
 
@@ -349,11 +333,11 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
             points.count > 1 else { return }
 
 
-        let uiScale: CGFloat = getContentScaleFactor()
+        let uiScale: CGFloat = SKTiledContentScaleFactor
 
         // polyline objects should have no fill
         self.fillColor = (self.objectType == .polyline) ? SKColor.clear : self.fillColor
-        self.isAntialiased = false //layer.antialiased
+        self.isAntialiased = layer.antialiased
         self.lineJoin = .miter
 
         // scale linewidth for smaller objects
@@ -361,7 +345,7 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
         self.lineWidth = (lwidth / layer.tileHeight < 0.075) ? lwidth : 0.5
 
         // flip the vertex values on the y-value for our coordinate transform.
-        // for some odd reason tile objects are flipped in the y-axis already, so ignore the translated
+        // for some odd reason Tiled tile objects are flipped in the y-axis already, so ignore the translated
         var translatedVertices: [CGPoint] = (isPolyType == true) ? (gid == nil) ? vertices.map { $0.invertedY } : vertices : (gid == nil) ? vertices.map { $0.invertedY } : vertices
 
         switch objectType {
@@ -386,7 +370,7 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
                 addChild(controlShape)
                 controlShape.fillColor = SKColor.clear
                 controlShape.strokeColor = self.strokeColor.withAlphaComponent(0.2)
-                controlShape.isAntialiased = true
+                controlShape.isAntialiased = layer.antialiased
                 controlShape.lineWidth = self.lineWidth / 2
             }
 
@@ -418,9 +402,12 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
         // if the object has a gid property, render it as a tile
         if let gid = gid {
             guard let tileData = layer.tilemap.getTileData(globalID: gid) else {
-                print("ERROR: Tile object \"\(name ?? "null")\" cannot access tile data for id: \(gid)")
+                log("Tile object \"\(name ?? "null")\" cannot access tile data for id: \(gid)", level: .error)
                 return
             }
+
+            // in Tiled, tile data type overrides object type
+            self.type = tileData.type
 
             // grab size from texture if initializing with a gid
             if (size == CGSize.zero) {
@@ -440,30 +427,31 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
             if (tileData.texture != nil) {
 
                 childNode(withName: "TILE_OBJECT")?.removeFromParent()
-                // TODO: need delegate tile class
                 if let tileSprite = SKTile(data: tileData) {
-                    
+
                     let boundingBox = polygonPath(translatedVertices)
                     let rect = boundingBox.boundingBox
 
                     tileSprite.name = "TILE_OBJECT"
                     tileSprite.size.width = rect.size.width
                     tileSprite.size.height = rect.size.height
-                    
+
                     addChild(tileSprite)
 
                     tileSprite.zPosition = zPosition - 1
                     tileSprite.position = rect.center
 
-                    // TODO: remove debug stroke color
                     isAntialiased = false
                     lineWidth = 0.75
-                    strokeColor = (debug == false) ? SKColor.clear : layer.gridColor.withAlphaComponent(0.75)
+                    strokeColor = SKColor.clear
                     fillColor = SKColor.clear
+
+                    // run tile animation
                     tileSprite.runAnimation()
 
+                    // set tile property
                     self.tile = tileSprite
-                    
+
                     // flipped tile flags
                     tileSprite.xScale = (tileData.flipHoriz == true) ? -1 : 1
                     tileSprite.yScale = (tileData.flipVert == true) ? -1 : 1
@@ -472,7 +460,7 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
         }
 
         // render text object as an image and use with a sprite
-        if let _ = text {
+        if (text != nil) {
             // initialize the text attrbutes if none exist
             if (textAttributes == nil) {
                 textAttributes = TextObjectAttributes()
@@ -481,39 +469,43 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
             // remove the current text object
             childNode(withName: "TEXT_OBJECT")?.removeFromParent()
 
-            // create an image to use as a texture
-            let image = drawTextObject(withScale: renderQuality)
+
 
             strokeColor = (debug == false) ? SKColor.clear : layer.gridColor.withAlphaComponent(0.75)
             fillColor = SKColor.clear
 
+            // render text to an image
+            var textImage = drawTextObject(withScale: renderQuality)
 
-            let textTexture = SKTexture(cgImage: image)
-            let textSprite = SKSpriteNode(texture: textTexture)
-            textSprite.name = "TEXT_OBJECT"
-            addChild(textSprite)
+            if (textImage != nil) {
+                let textTexture = SKTexture(cgImage: textImage!)
+                let textSprite = SKSpriteNode(texture: textTexture)
+                textSprite.name = "TEXT_OBJECT"
+                addChild(textSprite)
 
-            // final scaling value depends on the quality factor
-            let finalScaleValue: CGFloat = (1 / renderQuality) / uiScale
-            textSprite.zPosition = zPosition - 1
-            textSprite.setScale(finalScaleValue)
-            textSprite.position = self.boundingRect.center
+                // final scaling value depends on the quality factor
+                let finalScaleValue: CGFloat = (1 / renderQuality) / uiScale
+                textSprite.zPosition = zPosition - 1
+                textSprite.setScale(finalScaleValue)
+                textSprite.position = self.bounds.center
+            }
+
+            textImage = nil
         }
     }
 
     /**
      Draw the text object. Scale factor is to allow for text to render clearly at higher zoom levels.
 
-     - parameter textValue: `String` text string.
      - parameter withScale: `CGFloat` size scale.
      - returns: `CGImage` rendered text image.
      */
-    open func drawTextObject(withScale: CGFloat=8) -> CGImage {
+    open func drawTextObject(withScale: CGFloat=8) -> CGImage? {
 
-        let uiScale: CGFloat = getContentScaleFactor()
+        let uiScale: CGFloat = SKTiledContentScaleFactor
 
         // the object's bounding rect
-        let textRect = self.boundingRect
+        let textRect = self.bounds
         let scaledRect = textRect * withScale
 
         // need absolute size
@@ -530,44 +522,44 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
             let textFontAttributes: [NSAttributedStringKey : Any] = [
                     NSAttributedStringKey.font: textAttributes.font,
                     NSAttributedStringKey.foregroundColor: textAttributes.fontColor,
-                    NSAttributedStringKey.paragraphStyle: textStyle,
+                    NSAttributedStringKey.paragraphStyle: textStyle
                     ]
 
-            // TODO: vertical alignment is slightly off from Tiled, NSStringDrawingContext needs 10.11
             // setup vertical alignment
             let fontHeight: CGFloat
             #if os(iOS) || os(tvOS)
-            fontHeight = self.text!.boundingRect(with: CGSize(width: bounds.width, height: CGFloat.infinity), options: .usesLineFragmentOrigin, attributes: textFontAttributes as [String : Any], context: nil).height
+            fontHeight = self.text!.boundingRect(with: CGSize(width: bounds.width, height: CGFloat.infinity), options: .usesLineFragmentOrigin, attributes: textFontAttributes, context: nil).height
             #else
-            fontHeight = self.text!.boundingRect(with: CGSize(width: bounds.width, height: CGFloat.infinity), options: NSString.DrawingOptions.usesLineFragmentOrigin, attributes: textFontAttributes).height
+            fontHeight = self.text!.boundingRect(with: CGSize(width: bounds.width, height: CGFloat.infinity), options: .usesLineFragmentOrigin, attributes: textFontAttributes).height
             #endif
             // vertical alignment
             // center aligned...
             if (textAttributes.alignment.vertical == .center) {
                 let adjustedRect: CGRect = CGRect(x: scaledRect.minX, y: scaledRect.minY + (scaledRect.height - fontHeight) / 2, width: scaledRect.width, height: fontHeight)
                 #if os(macOS)
-                textRect.clip()
+                __NSRectClip(textRect)
                 #endif
-                self.text!.draw(in: adjustedRect.offsetBy(dx: 0, dy: 2 * withScale), withAttributes: textFontAttributes as [String : Any])
+                self.text!.draw(in: adjustedRect.offsetBy(dx: 0, dy: 2 * withScale), withAttributes: textFontAttributes)
 
             // top aligned...
             } else if (textAttributes.alignment.vertical == .top) {
-                self.text!.draw(in: bounds, withAttributes: textFontAttributes as [String : Any])
+                self.text!.draw(in: bounds, withAttributes: textFontAttributes)
                 //self.text!.draw(in: bounds.offsetBy(dx: 0, dy: 1.25 * withScale), withAttributes: textFontAttributes)
 
             // bottom aligned
             } else {
                 let adjustedRect: CGRect = CGRect(x: scaledRect.minX, y: scaledRect.minY, width: scaledRect.width, height: fontHeight)
                 #if os(macOS)
-                textRect.clip()
+                __NSRectClip(textRect)
                 #endif
-                self.text!.draw(in: adjustedRect.offsetBy(dx: 0, dy: 2 * withScale), withAttributes: textFontAttributes as [String : Any])
+                self.text!.draw(in: adjustedRect.offsetBy(dx: 0, dy: 2 * withScale), withAttributes: textFontAttributes)
             }
             context.restoreGState()
         }
     }
 
-    // MARK: - Polygon Points
+    // MARK: - Geometry
+
     /**
      Add polygons points.
 
@@ -575,8 +567,7 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
      - parameter closed: `Bool` close the object path.
      */
     internal func addPoints(_ coordinates: [[CGFloat]], closed: Bool=true) {
-        self.objectType = (closed == true) ? SKObjectType.polygon : SKObjectType.polyline
-
+        self.objectType = (closed == true) ? ObjectType.polygon : ObjectType.polyline
         // create an array of points from the given coordinates
         points = coordinates.map { CGPoint(x: $0[0], y: $0[1]) }
     }
@@ -615,37 +606,51 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
     }
 
     /**
-     Draw the object's boundary shape.
+     Draw the object's bounding shape.
+     
+     - parameter withColor: `SKColor?` optional highlight color.
+     - parameter zpos:      `CGFloat?` optional z-position of bounds shape.
+     - parameter duration:  `TimeInterval` effect length.
      */
-    internal func drawBounds() {
-        childNode(withName: "BOUNDS")?.removeFromParent()
+    internal func drawBounds(withColor: SKColor?=nil, zpos: CGFloat?=nil, duration: TimeInterval = 0) {
+        
+        childNode(withName: boundsKey)?.removeFromParent()
+        childNode(withName: "FIRST_POINT")?.removeFromParent()
 
+
+        // if a color is not passed, use the default frame color
+        let drawColor = (withColor != nil) ? withColor! : self.frameColor
+
+
+        // default line width
+        let defaultLineWidth: CGFloat = 1
         guard let vertices = getVertices() else { return }
 
         let flippedVertices = (gid == nil) ? vertices.map { $0.invertedY } : vertices
         let renderQuality = (layer != nil) ? layer!.renderQuality : 8
-        let highlightColor = (layer != nil) ? layer!.highlightColor : SKColor(hexString: "#ff8fff")
 
         //let vertices = frame.points
 
         // scale vertices
         let scaledVertices = flippedVertices.map { $0 * renderQuality }
         let path = polygonPath(scaledVertices)
+
+        // create the bounds shape
         let bounds = SKShapeNode(path: path)
-        bounds.name = "BOUNDS"
-        let shapeZPos = zPosition + 10
+        bounds.name = boundsKey
+        let shapeZPos = zPosition + 50
 
         // draw the path
         bounds.isAntialiased = layer.antialiased
         bounds.lineCap = .round
         bounds.lineJoin = .miter
         bounds.miterLimit = 0
-        bounds.lineWidth = 0.5 * (renderQuality / 2)
+        bounds.lineWidth = defaultLineWidth * (renderQuality / 2)
 
-        bounds.strokeColor = highlightColor.withAlphaComponent(0.4)
-        bounds.fillColor = highlightColor.withAlphaComponent(0.15)  // 0.35
+        bounds.strokeColor = drawColor.withAlphaComponent(0.4)
+        bounds.fillColor = drawColor.withAlphaComponent(0.15)  // 0.35
         bounds.zPosition = shapeZPos
-
+        bounds.isAntialiased = layer.antialiased
 
         // anchor point
         let tileHeight = (layer != nil) ? layer.tilemap.tileHeight : 8
@@ -655,9 +660,9 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
 
         anchor.name = "ANCHOR"
         bounds.addChild(anchor)
-        anchor.fillColor = highlightColor.withAlphaComponent(0.2)
+        anchor.fillColor = bounds.strokeColor
         anchor.strokeColor = SKColor.clear
-        anchor.zPosition = shapeZPos + 10
+        anchor.zPosition = shapeZPos
         anchor.isAntialiased = layer.antialiased
 
 
@@ -667,7 +672,7 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
 
         pointShape.name = "FIRST_POINT"
         bounds.addChild(pointShape)
-        pointShape.fillColor = .orange //highlightColor
+        pointShape.fillColor = bounds.fillColor
         pointShape.strokeColor = SKColor.clear
         pointShape.zPosition = shapeZPos * 15
         pointShape.isAntialiased = layer.antialiased
@@ -676,6 +681,13 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
 
         addChild(bounds)
         bounds.setScale(1 / renderQuality)
+
+        if (duration > 0) {
+            let fadeAction = SKAction.fadeAfter(wait: duration, alpha: 0)
+            bounds.run(fadeAction, withKey: "FADEOUT_ACTION", completion: {
+                bounds.removeFromParent()
+            })
+        }
     }
 
     // MARK: - Debugging
@@ -683,19 +695,18 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
     /// Show/hide the object's boundary shape.
     open var showBounds: Bool {
         get {
-            return (childNode(withName: "BOUNDS") != nil) ? childNode(withName: "BOUNDS")!.isHidden == false : false
+            return (childNode(withName: boundsKey) != nil) ? childNode(withName: boundsKey)!.isHidden == false : false
         }
         set {
-            childNode(withName: "BOUNDS")?.removeFromParent()
+            childNode(withName: boundsKey)?.removeFromParent()
 
             if (newValue == true) {
-
                 isHidden = false
 
                 // draw the tile boundary shape
                 drawBounds()
 
-                guard let frameShape = childNode(withName: "BOUNDS") else { return }
+                guard let frameShape = childNode(withName: boundsKey) else { return }
 
                 let highlightDuration: TimeInterval = (layer != nil) ? layer!.highlightDuration : 0
 
@@ -726,7 +737,7 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
     open func setupPhysics() {
         guard let layer = layer else { return }
         guard let objectPath = path else {
-            print("Warning: object path not set: \"\(self.name != nil ? self.name! : "null")\"")
+            log("object path not set: \"\(self.name != nil ? self.name! : "null")\"", level: .warning)
             return
         }
 
@@ -747,11 +758,12 @@ open class SKTileObject: SKShapeNode, SKTiledObject {
             physicsBody = SKPhysicsBody(polygonFrom: objectPath)
         }
 
+
         physicsBody?.isDynamic = (physicsType == .dynamic)
         physicsBody?.affectedByGravity = (physicsType == .dynamic)
         physicsBody?.mass = (doubleForKey("mass") != nil) ? CGFloat(doubleForKey("mass")!) : 1.0
         physicsBody?.friction = (doubleForKey("friction") != nil) ? CGFloat(doubleForKey("friction")!) : 0.2
-        physicsBody?.restitution = (doubleForKey("restitution") != nil) ? CGFloat(doubleForKey("restitution")!) : 0.2  // bounciness
+        physicsBody?.restitution = (doubleForKey("restitution") != nil) ? CGFloat(doubleForKey("restitution")!) : 0.4  // bounciness
     }
 }
 
@@ -761,7 +773,7 @@ extension SKTileObject {
 
     /// Tile data description.
     override open var description: String {
-        let comma = propertiesString.characters.count > 0 ? ", " : ""
+        let comma = propertiesString.characters.isEmpty == false ? ", " : ""
         let objectName = name ?? "null"
         let typeString = (type != nil) ? ", type: \"\(type!)\"" : ""
         let layerDescription = (layer != nil) ? ", Layer: \"\(layer.layerName)\"" : ""
@@ -771,11 +783,36 @@ extension SKTileObject {
     override open var debugDescription: String {
         return "<\(description)>"
     }
+
+    open var shortDescription: String {
+        var result = "Object id: \(self.id)"
+        result += (self.type != nil) ? ", type: \"\(self.type!)\"" : ""
+        return result
+    }
 }
 
 
-// Tile animation
 extension SKTileObject {
+
+    /// Object opacity
+    open var opacity: CGFloat {
+        get {
+            return self.alpha
+        }
+        set {
+            self.alpha = newValue
+        }
+    }
+
+    /// Object visibility
+    open var visible: Bool {
+        get {
+            return !self.isHidden
+        }
+        set {
+            self.isHidden = !newValue
+        }
+    }
 
     /// Returns true if the object references an animated tile.
     open var isAnimated: Bool {

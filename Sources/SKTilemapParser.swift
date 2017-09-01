@@ -43,125 +43,130 @@ internal enum CompressionType: String {
 }
 
 
-// Parser logging level
-public enum LoggingLevel: Int {
-    case debug
-    case info
-    case warning
-    case error
-}
-
 /**
- The `SKTilemapParser` is a custom [`XMLParserDelegate`](https://developer.apple.com/reference/foundation/xmlparserdelegate) parser for reading Tiled TMX and tileset TSX files.
- To read a tile map, used the `SKTilemapParser.load` method:
 
- ```swift
- if let tilemap = SKTilemapParser().load(tmxFile: "sample-file") {
-    scene.worldNode.addChild(tilemap)
- }
- ```
+ ## Overview ##
+
+ The `SKTilemapParser` class is a custom [`XMLParserDelegate`](https://developer.apple.com/reference/foundation/xmlparserdelegate) 
+ parser for reading Tiled TMX and tileset TSX files.
+
+ This class is not meant to be called directly, but rather invoked via `SKTilemap.load` class function.
  */
-open class SKTilemapParser: NSObject, XMLParserDelegate {
-    
+internal class SKTilemapParser: NSObject, XMLParserDelegate, Loggable {
+
     private var fileManager = FileManager.default
-    open var rootPath: URL = Bundle.main.bundleURL
-    open var fileNames: [String] = []                               // list of resource files (for non-optional, see Bundle.main.bundleURL)
-    open var currentFilename: String!                               // the current filename being parsed
+    /// Root path of the current file (defaults to `Bundle.main.bundleURL`)
+    internal var rootPath: URL = Bundle.main.bundleURL
+    internal var fileNames: [String] = []
+    internal var currentFilename: String!                              // the current filename being parsed
 
-    internal var parsingMode: ParsingMode = .none                   // current parsing mode
+    internal var parsingMode: ParsingMode = .none                      // current parsing mode
     weak var mapDelegate: SKTilemapDelegate?
-    open var tilemap: SKTilemap!
+    internal var tilemap: SKTilemap!
 
-    fileprivate var encoding: TilemapEncoding = .xml                // xml encoding
-    fileprivate var tilesets: [String: SKTileset] = [:]             // stash external tilesets by FILE name (ie: ["kong-50x32.tsx": <SKTileset>])
-    fileprivate var tilesetImagesAdded: Int = 0                     // for reporting the number of images added to a collections tileset
+    fileprivate var encoding: TilemapEncoding = .xml                   // xml encoding
+    fileprivate var tilesets: [String: SKTileset] = [:]                // stash external tilesets by FILE name (ie: ["kong-50x32.tsx": <SKTileset>])
+    fileprivate var tilesetImagesAdded: Int = 0                        // for reporting the number of images added to a collections tileset
 
-    fileprivate var loggingLevel: LoggingLevel = .debug             // normally warning
-    fileprivate var activeElement: String?                          // current object
+    fileprivate var loggingLevel: LoggingLevel = SKTiledLoggingLevel   // normally warning
+    fileprivate var activeElement: String?                             // current object
 
-    fileprivate var lastElement: AnyObject?                         // last element created
-    fileprivate var elementPath: [AnyObject] = []                   // current element path
+    fileprivate var lastElement: AnyObject?                            // last element created
+    fileprivate var elementPath: [AnyObject] = []                      // current element path
 
-    fileprivate var currentID: Int?                                 // current tile/object ID
-    fileprivate var currentType: String?                            // current tile type
-    fileprivate var currentProbability: CGFloat?                    // current tile probability
+    fileprivate var currentID: Int?                                    // current tile/object ID
+    fileprivate var currentType: String?                               // current tile type
+    fileprivate var currentProbability: CGFloat?                       // current tile probability
 
-    fileprivate var properties: [String: String] = [:]              // last properties created
-    fileprivate var data: [String: [UInt32]] = [:]                  // store data for tile layers to render in a second pass
-    fileprivate var tileData: [UInt32] = []                         // last tile data read
-    fileprivate var characterData: String = ""                      // current tile data (string)
+    fileprivate var properties: [String: String] = [:]                 // last properties created
+    fileprivate var data: [String: [UInt32]] = [:]                     // store data for tile layers to render in a second pass
+    fileprivate var tileData: [UInt32] = []                            // last tile data read
+    fileprivate var characterData: String = ""                         // current tile data (string)
 
-    fileprivate var compression: CompressionType = .uncompressed    // compression type
-    fileprivate var timer: Date = Date()                            // timer
+    fileprivate var compression: CompressionType = .uncompressed       // compression type
+    fileprivate var timer: Date = Date()                               // timer
     fileprivate var finishedParsing: Bool = false
-    fileprivate var ignoreProperties: Bool = false                  // ignore custom properties
+    fileprivate var ignoreProperties: Bool = false                     // ignore custom properties
+    fileprivate var layerIndex: Int = 0
 
     // dispatch queues & groups
+    internal let parsingQueue = DispatchQueue.global(qos: .userInteractive)
     internal let renderGroup = DispatchGroup()
 
     // MARK: - Loading
-    
+
     /**
      Load a TMX file and parse it.
 
-     - parameter filename:         `String` Tiled file name (does not need TMX extension).
-     - parameter inDirectory:      `String?` optional path for file.
+     - parameter tmxFile:          `String` Tiled file name (does not need TMX extension).
+     - parameter inDirectory:      `String?` search path for assets.
      - parameter delegate:         `SKTilemapDelegate?` optional tilemap delegate instance.
      - parameter withTilesets:     `[SKTileset]?` use existing tilesets to create the tile map.
      - parameter ignoreProperties: `Bool` ignore custom properties from Tiled.
-     - parameter verbosity:        `LoggingLevel` logging verbosity.
+     - parameter loggingLevel:    `LoggingLevel` logging verbosity.
      - returns: `SKTilemap?` tiled map node.
      */
-    open func load(tmxFile: String,
-                   inDirectory: String? = nil,
-                   delegate: SKTilemapDelegate? = nil,
-                   withTilesets: [SKTileset]? = nil,
-                   ignoreProperties noparse: Bool = false,
-                   verbosity: LoggingLevel = .info,
-                   renderQueue: DispatchQueue) -> SKTilemap? {
-        
+    internal func load(tmxFile: String,
+                       inDirectory: String? = nil,
+                       delegate: SKTilemapDelegate? = nil,
+                       withTilesets: [SKTileset]? = nil,
+                       ignoreProperties noparse: Bool = false,
+                       loggingLevel: LoggingLevel = .info,
+                       renderQueue: DispatchQueue) -> SKTilemap? {
+
+
+        // current parsing mode
         parsingMode = .tmx
-        
+
+        // set the delegate property
+        self.mapDelegate = delegate
+        self.timer = Date()
+        self.ignoreProperties = noparse
+        self.loggingLevel = loggingLevel
+
+        // append extension if not already there.
+        var tmxFilename = tmxFile
+        if !tmxFilename.hasSuffix(".tmx") {
+            tmxFilename = tmxFilename.appending(".tmx")
+        }
+
+        log("file name: \"\(tmxFilename)\"", level: .debug)
+
+        // if a directory is passed, use that as the root path, otherwise default to bundle's resource
         if let resourceURL = Bundle.main.resourceURL {
             rootPath = resourceURL
         }
-        
+
+        // if the user has passed a search directory...
         if let rootDirectory = inDirectory {
-            rootPath = URL(fileURLWithPath: rootDirectory)
+            rootPath = self.getAssetDirectory(path: rootDirectory)
         }
-        
-        
-        
+
         // create a url relative to the current root
-        let fileURL = URL(fileURLWithPath: tmxFile, relativeTo: rootPath)
+        let fileURL = URL(fileURLWithPath: tmxFilename, relativeTo: rootPath)
         fileNames.append(fileURL.path)
-        
-        // set the delegate property
-        mapDelegate = delegate
-        timer = Date()
-        ignoreProperties = noparse
-        loggingLevel = verbosity
-        
+
+
         // add existing tilesets
         if let withTilesets = withTilesets {
             for tileset in withTilesets {
 
                 guard let filename = tileset.filename else {
-                    print("ERROR: tileset \"\(tileset.name)\" has no filename property.")
+                    log("tileset \"\(tileset.name)\" has no filename property.", level: .error)
                     continue
                 }
-                
+
                 tilesets[filename] = tileset
             }
         }
 
         while !(fileNames.isEmpty) {
-            
+
             if let firstFileName = fileNames.first {
-                
+
                 currentFilename = firstFileName
-                let currentFile = firstFileName.url.lastPathComponent                
-                
+                let currentFile = firstFileName.url.lastPathComponent
+
                 defer { fileNames.remove(at: 0) }
 
 
@@ -182,21 +187,21 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                 if let ftype = FileType(rawValue: fileExt) {
                     filetype = ftype.description
                 }
-                
-                if loggingLevel.rawValue <= 1 {
-                    print("[SKTilemapParser]: \(parsingMode) parser: reading \(filetype): \"\(currentFile)\"")
-                }
-                
+
                 // absolute url
                 let currentURL = URL(fileURLWithPath: currentFilename)
-                
-                
+
+
                 // check that file exists
-                guard fileManager.fileExists(atPath: currentURL.path) else {
-                    print("[SKTilemapParser]: file: \"\(currentFile)\" does not exist.")
-                    return nil
+                guard self.fileExists(at: currentURL) else { return nil }
+
+                log("\(parsingMode) parser: reading \(filetype): \"\(currentFile)\"", level: .info)
+
+                // set the root path to the current file
+                if let currentParent = currentURL.parent {
+                    rootPath = URL(fileURLWithPath: currentParent)
                 }
-                
+
                 // read the data
                 let data: Data = try! Data(contentsOf: currentURL)
                 let parser: XMLParser = XMLParser(data: data)
@@ -213,10 +218,13 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                     let errorCol = parser.columnNumber
 
                     let errorDescription = parseError!.localizedDescription
-                    print("[SKTilemapParser]: \(parsingMode) parser: \(errorDescription) at line:\(errorLine), column: \(errorCol)")
+                    log("\(parsingMode) parser: \(errorDescription) at line:\(errorLine), column: \(errorCol)", level: .error)
+
                 }
             }
         }
+
+
 
         guard let currentMap = self.tilemap else { return nil }
 
@@ -226,46 +234,56 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
         // pre-processing callback
         renderQueue.sync {
             self.mapDelegate?.didReadMap(currentMap)
-            
-            // start rendering layers when queue is complete.
-            DispatchQueue.main.async {
-                self.didBeginRendering(currentMap, queue: renderQueue)
-            }
         }
-        
-        
+
+        parsingQueue.sync {
+            self.didBeginRendering(currentMap, queue: renderQueue)
+        }
+
         return currentMap
     }
 
     /**
      Load tilesets from external files.
 
-     - parameter filenames:         `[String]` tileset filename.
-     - parameter delegate:          `SKTilemapDelegate?` optional tilemap delegate instance.
-     - parameter ignoreProperties:  `Bool` ignore custom properties from Tiled.
+     - parameter tsxFiles:         `[String]` array of tileset filenames.
+     - parameter inDirectory:      `String?` search path for assets.
+     - parameter delegate:         `SKTilemapDelegate?` optional tilemap delegate instance.
+     - parameter ignoreProperties: `Bool` ignore custom properties from Tiled.
+     - parameter loggingLevel:    `LoggingLevel` logging verbosity.
      - returns: `[SKTileset]` tilesets.
      */
-    open func load(tsxFiles: [String],
-                   inDirectory: String? = nil,
-                   delegate: SKTilemapDelegate? = nil,
-                   ignoreProperties noparse: Bool = false) -> [SKTileset] {
-        
-        
-        
-        
+    public func load(tsxFiles: [String],
+                     inDirectory: String? = nil,
+                     delegate: SKTilemapDelegate? = nil,
+                     ignoreProperties noparse: Bool = false,
+                     loggingLevel: LoggingLevel = .info,
+                     renderQueue: DispatchQueue) -> [SKTileset] {
+
+
+
+        // current parsing mode is tsx
         parsingMode = .tsx
-        
+
+        // set the delegate property
+        self.mapDelegate = delegate
+        self.timer = Date()
+        self.loggingLevel = loggingLevel
+        self.ignoreProperties = noparse
+
+        // if a directory is passed, use that as the root path, otherwise default to bundle's resource
         if let resourceURL = Bundle.main.resourceURL {
             rootPath = resourceURL
         }
-        
+
+        // if the user has passed a search directory...
         if let rootDirectory = inDirectory {
-            rootPath = URL(fileURLWithPath: rootDirectory)
+            rootPath = self.getAssetDirectory(path: rootDirectory)
         }
 
-        
+        // create urls relative to root
         for tsxfile in tsxFiles {
-            // create a url relative to the current root
+
             let fileURL = URL(fileURLWithPath: tsxfile, relativeTo: rootPath)
             if fileManager.fileExists(atPath: fileURL.path) {
                 fileNames.append(fileURL.path)
@@ -273,11 +291,8 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
         }
 
 
-        // set the delegate property
-        mapDelegate = delegate
-        timer = Date()
 
-        // results
+        // stash results
         var tilesetResults: [SKTileset] = []
 
         while !(fileNames.isEmpty) {
@@ -285,11 +300,10 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
 
                 currentFilename = firstFileName
                 let currentFile = firstFileName.url.lastPathComponent
-                
-                
-                
+
+
                 defer { fileNames.remove(at: 0) }
-                
+
 
                 // check file type
                 var fileExt = currentFilename.components(separatedBy: ".").last!
@@ -308,20 +322,21 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                 if let ftype = FileType(rawValue: fileExt) {
                     filetype = ftype.description
                 }
-                
-                if loggingLevel.rawValue <= 1 {
-                    print("[SKTilemapParser]: \(parsingMode) parser: reading \(filetype): \"\(currentFile)\"")
-                }
-                
+
+
                 // absolute url
                 let currentURL = URL(fileURLWithPath: currentFilename)
-                
+
                 // check that file exists
-                guard fileManager.fileExists(atPath: currentURL.path) else {
-                    print("[SKTilemapParser]: file: \"\(currentFile)\" does not exist.")
-                    return []
+                guard self.fileExists(at: currentURL) else { continue }
+
+                log("\(parsingMode) parser: reading \(filetype): \"\(currentFile)\"", level: .info)
+
+                // set the root path to the current file
+                if let currentParent = currentURL.parent {
+                    rootPath = URL(fileURLWithPath: currentParent)
                 }
-                
+
                 // read file data
                 let data: Data = try! Data(contentsOf: currentURL)
                 let parser: XMLParser = XMLParser(data: data)
@@ -338,20 +353,22 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                     let errorCol = parser.columnNumber
 
                     let errorDescription = parseError!.localizedDescription
-                    print("[SKTilemapParser]: \(parsingMode) parser: \(errorDescription) at line:\(errorLine), column: \(errorCol)")
+                    Logger.default.cache(LogEvent("\(parsingMode) parser: \(errorDescription) at line:\(errorLine), column: \(errorCol)", level: .error, caller: self.logSymbol))
                 }
             }
         }
 
-        for filename in tsxFiles {
-            for (tsxfile, tileset) in tilesets {
-                let basename = tsxfile.components(separatedBy: ".").first!
-                if basename == filename || tsxfile == filename {
-                    tilesetResults.append(tileset)
+        renderQueue.sync {
+            for filename in tsxFiles {
+                for (tsxfile, tileset) in tilesets {
+                    let basename = tsxfile.components(separatedBy: ".").first!
+                    if basename == filename || tsxfile == filename {
+                        tilesetResults.append(tileset)
+                    }
                 }
             }
         }
-        
+
         return tilesetResults
     }
 
@@ -370,74 +387,116 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
 
         // loop through the layers
         for layer in tilemap.getLayers(recursive: true) {
-            
+
+
             // assign each layer a work item
-            let renderItem = DispatchWorkItem() {
+            let renderItem = DispatchWorkItem {
                 // render object groups
                 if let objectGroup = layer as? SKObjectGroup {
                     objectGroup.drawObjects()
                 }
 
                 // render image layers
-                if let _ = layer as? SKImageLayer {}
+                //_ = layer as? SKImageLayer {}
 
                 // render tile layers
                 if let tileLayer = layer as? SKTileLayer {
-                    
-                    // TODO: guard here for tileData
-                    
+
                     if let tileData = self.data[tileLayer.uuid] {
                         // add the layer data
-                        let _ = tileLayer.setLayerData(tileData, debug: debugLevel)
+                        if (tileLayer.setLayerData(tileData, debug: debugLevel) == false) {
+                            self.log("layer \"\(tileLayer.layerName)\" failed to set data.", level: .warning)
+                        }
                     }
 
                     // report errors
-                    if tileLayer.gidErrors.count > 0 {
+                    if tileLayer.gidErrors.isEmpty == false {
                         let gidErrorString : String = tileLayer.gidErrors.reduce("", { "\($0)" == "" ? "\($1)" : "\($0)" + ", " + "\($1)" })
-                        print("[SKTilemapParser]: WARNING: layer \"\(tileLayer.layerName)\": the following gids could not be found: \(gidErrorString)")
+                        Logger.default.cache(LogEvent("layer \"\(tileLayer.layerName)\": the following gids could not be found: \(gidErrorString)", level: .warning, caller: self.logSymbol))
                     }
                 }
+
+                // run the layer callback on the parser queue
+                self.parsingQueue.sync {
+                    layer.didFinishRendering(duration: duration)
+                }
+
             }
 
+            // add the layer render work item to the external queue
             queue.async(group: renderGroup, execute: renderItem)
         }
 
-
         // run callbacks when the group is finished
         renderGroup.notify(queue: DispatchQueue.main) {
-            
             self.data = [:]
             self.tilesets = [:]
-            
-            for layer in self.tilemap.getLayers() {
-                layer.didFinishRendering(duration: duration)
-            }
         }
-        
-        queue.sync {
-            // build any pathfinding graphs
-            let nodeClass = self.mapDelegate?.objectForGraphNode(className: nil) ?? SKTiledGraphNode.self
-            self.tilemap.buildPathfindingGraphs()
-        }
-        
-        // sync the tilemap's queue here
+
+        // release logging messages
+        Logger.default.release()
+
+        // sync external queue here
         queue.sync {
             self.tilemap.didFinishRendering(timeStarted: self.timer)
         }
     }
 
 
+    // MARK: - Helpers
+
+    /**
+     Return the curret asset directory.
+
+     - parameter url:  `URL` file url.
+     - returns  `Bool` file exists.
+     */
+    internal func getAssetDirectory(path: String) -> URL {
+        // if the path is a directory that exists, return it.
+        if (path.isDirectory == true) {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+
+
+        // if the path argument respresents a directory name, append it to the resource path.
+        let relativePath = self.rootPath.appendingPathComponent(path)
+
+        if (relativePath.isDirectory == true) {
+            return relativePath
+        }
+
+        // if neither of the paths exists, just return the current root
+        return rootPath
+    }
+
+    /**
+     Returns true if the file exists on disk.
+
+     - parameter url:  `URL` file url.
+     - returns  `Bool` file exists.
+     */
+    internal func fileExists(at url: URL) -> Bool {
+        // check that file exists
+        guard fileManager.fileExists(atPath: url.path) else {
+            //log("file: \"\(url.path)\" does not exist.", level: .warning)
+            return false
+        }
+        return true
+    }
+
+
     // MARK: - XMLParserDelegate
-    public func parser(_ parser: XMLParser,
-                       didStartElement elementName: String,
-                       namespaceURI: String?,
-                       qualifiedName qName: String?,
-                       attributes attributeDict: [String: String])  {
+    internal func parser(_ parser: XMLParser,
+                         didStartElement elementName: String,
+                         namespaceURI: String?,
+                         qualifiedName qName: String?,
+                         attributes attributeDict: [String: String])  {
 
         activeElement = elementName
 
         if (elementName == "map") {
             guard let tilemap = SKTilemap(attributes: attributeDict) else {
+                self.log("could not create tilemap.", level: .fatal)
                 parser.abortParsing()
                 return
             }
@@ -446,28 +505,29 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
             self.tilemap = tilemap
             self.tilemap.ignoreProperties = self.ignoreProperties
             self.tilemap.delegate = self.mapDelegate
-            
             self.tilemap.url = URL(fileURLWithPath: currentFilename)
 
+            self.log("Tiled version: \(SKTiledTiledApplicationVersion)", level: .debug)
 
             if (self.mapDelegate != nil) {
                 self.tilemap.zDeltaForLayers = self.mapDelegate!.zDeltaForLayers
             }
-            
+
             let currentFile = currentFilename.url.lastPathComponent
             let currentBasename = currentFile.components(separatedBy: ".").first!
 
             // `SKTilemap.filename` represents the tmx filename (minus .tmx extension)
             self.tilemap.name = currentBasename
-
+            self.tilemap.displayName = currentBasename
+            
             // run setup functions on tilemap
             self.mapDelegate?.didBeginParsing(tilemap)
 
             lastElement = tilemap
             elementPath.append(tilemap)
         }
-        
-        
+
+
         // MARK: - Tilesets
         // external will have a 'source' attribute, otherwise 'image'
         if (elementName == "tileset") {
@@ -480,18 +540,18 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
             if let source = attributeDict["source"] {
                 // get the first gid attribute
                 guard let firstgid = attributeDict["firstgid"] else {
-                    print("ERROR: external tileset reference \"\(source)\" with no firstgid.")
-                    parser.abortParsing();
+                    log("external tileset reference \"\(source)\" with no firstgid.", level: .fatal)
+                    parser.abortParsing()
                     return
                 }
 
                 let firstGID = Int(firstgid)!
 
                 // check to see if tileset already exists (either an empty new tileset, or we've passed a pre-loaded tileset).
-                
+
                 let externalTileset = URL(fileURLWithPath: source, relativeTo: rootPath)
-                
-                if let existingTileset = tilesets[externalTileset.path]  {
+
+                if let existingTileset = tilesets[externalTileset.path] {
                     self.tilemap?.addTileset(existingTileset)
 
                     // set the first gid parameter
@@ -510,20 +570,20 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
 
                         // append the source path to parse queue
                         let tilesetFileURL = URL(fileURLWithPath: source, relativeTo: rootPath)
-                        
+
                         // check that file exists
-                        guard fileManager.fileExists(atPath: tilesetFileURL.path) else {
-                            print("[SKTilemapParser]: ERROR: tileset: \"\(tilesetFileURL.path)\" does not exist.")
+                        guard self.fileExists(at: tilesetFileURL) else {
+                            self.log("tileset file not found: \"\(tilesetFileURL.lastPathComponent)\".", level: .fatal)
                             parser.abortParsing()
                             return
                         }
-                        
-                        
+
                         fileNames.append(tilesetFileURL.path)
 
                         // create a new tileset
                         let tileset = SKTileset(source: source, firstgid: firstGID, tilemap: self.tilemap)
                         tileset.loggingLevel = self.loggingLevel
+                        tileset.ignoreProperties = self.ignoreProperties
 
                         // add tileset to external file list (full file name)
                         tilesets[externalTileset.path] = tileset
@@ -532,8 +592,6 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                         self.tilemap?.addTileset(tileset)
                         lastElement = tileset
 
-                        // delegate callback
-                        if mapDelegate != nil { mapDelegate!.didAddTileset(tileset) }
                         // set this to nil, just in case we're looking for a collections tileset.
                         currentID = nil
                     }
@@ -545,16 +603,18 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
 
                 // update an existing tileset ( to set properties like `name`)
                 if let existingTileset = tilesets[currentFilename] {
-                    
+
                     guard let width = attributeDict["tilewidth"] else { parser.abortParsing(); return }
                     guard let height = attributeDict["tileheight"] else { parser.abortParsing(); return }
-                    guard let columns = attributeDict["columns"] else { parser.abortParsing(); return }
 
                     existingTileset.name = name
                     existingTileset.tileSize = CGSize(width: CGFloat(Int(width)!), height: CGFloat(Int(height)!))
-                    existingTileset.columns = Int(columns)!
 
                     // optionals
+                    if let columns = attributeDict["columns"] {
+                         existingTileset.columns = Int(columns)!
+                    }
+
                     if let spacing = attributeDict["spacing"] {
                         existingTileset.spacing = Int(spacing)!
                     }
@@ -569,18 +629,15 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                     // create inline tileset
                     guard let tileset = SKTileset(attributes: attributeDict) else { parser.abortParsing(); return }
                     tileset.loggingLevel = self.loggingLevel
+                    tileset.ignoreProperties = self.ignoreProperties
 
                     // add the tileset to the tilemap (if it exists)
                     self.tilemap?.addTileset(tileset)
 
                     lastElement = tileset
 
-                    // delegate callback
-                    if mapDelegate != nil { mapDelegate!.didAddTileset(tileset) }
-
                     // set this to nil, just in case we're looking for a collections tileset.
                     currentID = nil
-
 
                     if (parsingMode == .tsx) {
                         guard let currentFilename = currentFilename else {
@@ -619,18 +676,22 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
             guard let layerName = attributeDict["name"] else { parser.abortParsing(); return }
             guard let layer = SKTileLayer(tilemap: self.tilemap!, attributes: attributeDict)
                 else {
-                    print("Error creating tile layer: \"\(layerName)\"")
+                    log("Error creating tile layer: \"\(layerName)\"", level: .fatal)
                     parser.abortParsing()
                     return
             }
 
             let parentElement = elementPath.last!
             if let group = parentElement as? SKGroupLayer {
-                group.addLayer(layer)
+                let _ = group.addLayer(layer)
+                layer.rawIndex = layerIndex
+                layerIndex += 1
             }
 
             if let tilemap = parentElement as? SKTilemap {
-                tilemap.addLayer(layer, base: false)
+                let _ = tilemap.addLayer(layer)
+                layer.rawIndex = layerIndex
+                layerIndex += 1
             }
 
 
@@ -639,9 +700,6 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
 
         // 'objectgroup' indicates an Object layer or tile collision
         if (elementName == "objectgroup") {
-
-            // TODO: need exception for tile collision objects
-            //guard let _ = attributeDict["name"] else { parser.abortParsing(); return }
 
             // if tileset is last element and currentID exists....
             if let tileset = lastElement as? SKTileset {
@@ -664,11 +722,15 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                 let parentElement = elementPath.last!
 
                 if let group = parentElement as? SKGroupLayer {
-                    group.addLayer(objectsGroup)
+                    let _ = group.addLayer(objectsGroup)
+                    objectsGroup.rawIndex = layerIndex
+                    layerIndex += 1
                 }
 
                 if let tilemap = parentElement as? SKTilemap {
-                    tilemap.addLayer(objectsGroup, base: false)
+                    let _ = tilemap.addLayer(objectsGroup)
+                    objectsGroup.rawIndex = layerIndex
+                    layerIndex += 1
                 }
 
 
@@ -687,11 +749,15 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
 
             let parentElement = elementPath.last!
             if let group = parentElement as? SKGroupLayer {
-                group.addLayer(imageLayer)
+                let _ = group.addLayer(imageLayer)
+                imageLayer.rawIndex = layerIndex
+                layerIndex += 1
             }
 
             if let tilemap = parentElement as? SKTilemap {
-                tilemap.addLayer(imageLayer, base: false)
+                let _ = tilemap.addLayer(imageLayer)
+                imageLayer.rawIndex = layerIndex
+                layerIndex += 1
             }
 
 
@@ -703,21 +769,28 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
             guard let _ = attributeDict["name"] else { parser.abortParsing(); return }
             guard let groupLayer = SKGroupLayer(tilemap: self.tilemap!, attributes: attributeDict)
                 else {
+                    log("error parsing group layer.", level: .fatal)
                     parser.abortParsing()
                     return
             }
 
             let parentElement = elementPath.last!
             if let group = parentElement as? SKGroupLayer {
-                group.addLayer(groupLayer)
+                let _ = group.addLayer(groupLayer)
+                groupLayer.rawIndex = layerIndex
+                layerIndex += 1
             }
 
             if let tilemap = parentElement as? SKTilemap {
-                tilemap.addLayer(groupLayer, base: false)
+                let _ = tilemap.addLayer(groupLayer)
+                groupLayer.rawIndex = layerIndex
+                layerIndex += 1
             }
 
             // delegate callback
-            mapDelegate?.didAddLayer(groupLayer)
+            parsingQueue.sync {
+                self.mapDelegate?.didAddLayer(groupLayer)
+            }
 
             elementPath.append(groupLayer)
             lastElement = groupLayer
@@ -727,17 +800,19 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
         if (elementName == "image") {
             guard attributeDict["width"] != nil,
                 attributeDict["height"] != nil,
-                let imageSource = attributeDict["source"] else {
+                let sourceImageName = attributeDict["source"] else {
+                        log("source image not found.", level: .fatal)
                         parser.abortParsing()
                         return
             }
 
-            // match images to the AssetManager's `images` value
-            
-            let imageURL = URL(fileURLWithPath: imageSource, isDirectory: false, relativeTo: rootPath)
-            
+
+            // image resources might be store in the xcassets catalog.
+            let imageURL = URL(fileURLWithPath: sourceImageName, isDirectory: false, relativeTo: rootPath)
+
+
             // get the absolute path to the image
-            let sourceImagePath = imageURL.path //matchedImage.absoluteURL.relativePath
+            let sourceImagePath = imageURL.path 
 
             // update an image layer
             if let imageLayer = lastElement as? SKImageLayer {
@@ -756,13 +831,18 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                     let tileData = tileset.addTilesetTile(currentID, source: sourceImagePath)
                     tilesetImagesAdded += 1
                     if (tileData == nil) {
-                        print("[SKTilemapParser]: \(parsingMode) parser: Warning: tile id \(currentID) is invalid.")
+                        log("\(parsingMode) parser: Warning: tile id \(currentID) is invalid.", level: .warning)
                     }
                 } else {
+
                     // add the tileset spritesheet image
-                    let buildTime = tileset.addTextures(fromSpriteSheet: sourceImagePath, replace: false, transparent: attributeDict["trans"])
-                    
-                    // TODO: tileset logging
+                    tileset.addTextures(fromSpriteSheet: sourceImagePath, replace: false, transparent: attributeDict["trans"])
+                    tileset.parseProperties(completion: nil)
+
+                    // delegate callback
+                    parsingQueue.sync {
+                        self.mapDelegate?.didAddTileset(tileset)
+                    }
                 }
             }
         }
@@ -799,6 +879,7 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                 }
 
             } else {
+                log("id not found.", level: .fatal)
                 parser.abortParsing()
                 return
             }
@@ -808,15 +889,17 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
         // id, x, y required
         if (elementName == "object") {
 
-            // adding a group to tileset tile
-            if let _ = lastElement as? SKTileset {
 
-            }
+            // adding a group to tileset tile
+            if let _ = lastElement as? SKTileset {}
 
             // adding a group to object layer
             if let objectGroup = lastElement as? SKObjectGroup {
-                guard let tileObject = SKTileObject(attributes: attributeDict) else {
-                    print("[SKTilemapParser]: \(parsingMode) parser: Error creating object.")
+
+                let Object = (tilemap.delegate != nil) ? tilemap.delegate!.objectForVectorType(named: attributeDict["type"]) : SKTileObject.self
+
+                guard let tileObject = Object.init(attributes: attributeDict) else {
+                    log("\(parsingMode) parser: Error creating object.", level: .fatal)
                     parser.abortParsing()
                     return
                 }
@@ -849,8 +932,7 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                     let coords = point.components(separatedBy: ",").flatMap { x in Double(x) }
                     coordinates.append(coords.flatMap { CGFloat($0) })
                 }
-                
-                // TODO: tile collision object
+
                 if let _ = lastElement as? SKTileset {
 
                 }
@@ -875,11 +957,8 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                     let coords = point.components(separatedBy: ",").flatMap { x in Double(x) }
                     coordinates.append(coords.flatMap { CGFloat($0) })
                 }
-                
-                // TODO: tile collision
-                if let _ = lastElement as? SKTileset {
 
-                }
+                if let _ = lastElement as? SKTileset {}
 
                 if let objectGroup = lastElement as? SKObjectGroup {
                     if (currentID != nil) {
@@ -894,7 +973,7 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
         // animated tiles
         if (elementName == "frame") {
             guard let currentID = currentID else {
-                print("[SKTilemapParser]: \(parsingMode) parser: cannot assign frame animation information without tile id")
+                log("\(parsingMode) parser: cannot assign frame animation information without tile id.", level: .fatal)
                 parser.abortParsing()
                 return
             }
@@ -902,6 +981,7 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
             guard let id = attributeDict["tileid"],
                 let duration = attributeDict["duration"],
                 let tileset = lastElement as? SKTileset else {
+                    log("fuck!", level: .fatal)
                     parser.abortParsing()
                     return
             }
@@ -988,10 +1068,10 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
 
 
     // Runs when parser ends a key: </key>
-    public func parser(_ parser: XMLParser,
-                       didEndElement elementName: String,
-                       namespaceURI: String?,
-                       qualifiedName qName: String?) {
+    internal func parser(_ parser: XMLParser,
+                         didEndElement elementName: String,
+                         namespaceURI: String?,
+                         qualifiedName qName: String?) {
 
         // look for last element to add properties to
         if elementName == "properties" {
@@ -1001,13 +1081,14 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                 for (key, value) in properties {
                     tilemap.properties[key] = value
                 }
-
+                
                 tilemap.parseProperties(completion: nil)
+
             }
 
             // layer properties
-            if let layer = lastElement as? TiledLayerObject {
-                if (currentID == nil){
+            if let layer = lastElement as? SKTiledLayerObject {
+                if (currentID == nil) {
                     for (key, value) in properties {
                         layer.properties[key] = value
                     }
@@ -1018,14 +1099,13 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
 
             // tileset properties
             if let tileset = lastElement as? SKTileset {
-                if (currentID == nil){
+                if (currentID == nil) {
                     tileset.properties = properties
                     tileset.parseProperties(completion: nil)
 
                 } else {
 
                     let tileID = tileset.firstGID + currentID!
-                    // TODO: check global
                     if let tileData = tileset.getTileData(globalID: tileID) {
                         for (key, value) in properties {
                             tileData.properties[key] = value
@@ -1046,7 +1126,7 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
         // look for last element to be a layer
         if (elementName == "data") {
             guard let tileLayer = lastElement as? SKTileLayer else {
-                print("[SKTilemapParser]: \(parsingMode) parser: cannot find layer to add data.")
+                log("\(parsingMode) parser: cannot find layer to add data.", level: .fatal)
                 parser.abortParsing()
                 return
             }
@@ -1079,6 +1159,7 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
                 data[tileLayer.uuid] = tileData
 
             } else {
+                log("error adding tile data.", level: .fatal)
                 parser.abortParsing()
                 return
             }
@@ -1090,7 +1171,7 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
         if (elementName == "tile") {
             // parse properties
             if let tileset = lastElement as? SKTileset {
-                if (currentID != nil){
+                if (currentID != nil) {
 
                     let tileID = tileset.firstGID + currentID!
                     if let currentTileData = tileset.getTileData(globalID: tileID) {
@@ -1140,40 +1221,46 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
             }
 
             // if we're dealing with a tile collision object...
-            if (lastElement as? SKTileset) != nil {
-                // TODO: Tile collision object here...
-            }
-
+            if (lastElement as? SKTileset) != nil {}
             //currentID = nil
         }
 
 
         if (elementName == "layer") {
-            // delegate callback
+
             if let tileLayer = lastElement as? SKTileLayer {
-                if mapDelegate != nil { mapDelegate!.didAddLayer(tileLayer) }
+
+                // delegate callback
+                parsingQueue.sync {
+                    self.mapDelegate?.didAddLayer(tileLayer)
+                }
             }
         }
 
         if (elementName == "objectgroup") {
-            // delegate callback
             if let objectGroup = lastElement as? SKObjectGroup {
-                if mapDelegate != nil { mapDelegate!.didAddLayer(objectGroup) }
+                // delegate callback
+                parsingQueue.sync {
+                    self.mapDelegate?.didAddLayer(objectGroup)
+                }
             }
         }
 
         if (elementName == "imagelayer") {
-            // delegate callback
             if let imageLayer = lastElement as? SKImageLayer {
-                if mapDelegate != nil { mapDelegate!.didAddLayer(imageLayer) }
+                // delegate callback
+                parsingQueue.sync {
+                    self.mapDelegate?.didAddLayer(imageLayer)
+                }
             }
         }
 
         if (elementName == "group") {
-
-            // delegate callback
             if let groupLayer = lastElement as? SKGroupLayer {
-                if mapDelegate != nil { mapDelegate!.didAddLayer(groupLayer) }
+                // delegate callback
+                parsingQueue.sync {
+                    self.mapDelegate?.didAddLayer(groupLayer)
+                }
             }
 
             // if we're closing a group layer, pop it from the element path
@@ -1196,8 +1283,11 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
         if (elementName == "tileset") {
             if tilesetImagesAdded > 0 {
                 if let tileset = lastElement as? SKTileset {
-                    if loggingLevel.rawValue <= 1 {
-                        print(" → tileset \"\(tileset.name)\" finished, \(tilesetImagesAdded) images added.\n")
+                    Logger.default.cache(LogEvent("tileset \"\(tileset.name)\" finished, \(tilesetImagesAdded) images added.", level: .debug, caller: self.logSymbol))
+                    tileset.isRendered = true
+                    // delegate callback
+                    parsingQueue.sync {
+                        self.mapDelegate?.didAddTileset(tileset)
                     }
                 }
                 tilesetImagesAdded = 0
@@ -1213,12 +1303,12 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
     }
 
     // foundCharacters happens whenever parser enters a key poop
-    public func parser(_ parser: XMLParser, foundCharacters string: String) {
+    internal func parser(_ parser: XMLParser, foundCharacters string: String) {
         // append data attribute
         characterData += string
     }
 
-    public func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) {
+    internal func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) {
         //if parseError.code == NSXMLParserError.InternalError {}
     }
 
@@ -1240,7 +1330,9 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
      - parameter compression: `CompressionType` compression type.
      - returns: `[UInt32]?` parsed data.
      */
-    fileprivate func decode(base64String data: String, compression: CompressionType = .uncompressed) -> [UInt32]? {
+    fileprivate func decode(base64String data: String,
+                            compression: CompressionType = .uncompressed) -> [UInt32]? {
+
         guard let decodedData = Data(base64Encoded: data, options: .ignoreUnknownCharacters) else {
             print("ERROR: data is not base64 encoded.")
             return nil
@@ -1263,7 +1355,7 @@ open class SKTilemapParser: NSObject, XMLParserDelegate {
 
 // MARK: - Extensions
 
-extension FileType {
+extension FileType: CustomStringConvertible {
     /// File type description.
     var description: String {
         switch self {
@@ -1273,99 +1365,3 @@ extension FileType {
         }
     }
 }
-
-/*
-public class AssetManager {
-
-    static let `default` = AssetManager()
-    private var roots: [URL] = []
-    private var resources: [URL] = []
-
-    public var resourceTypes: [String] = ["tmx", "tsx", "png"]
-
-    public init() {
-        // add the current resource path
-        if let rpath = Bundle.main.resourceURL {
-            print("[AssetManager]: adding root:  \"\(rpath.path)\"")
-            roots.append(rpath)
-        }
-        scanForResourceTypes()
-    }
-
-    public var tilemaps: [URL] {
-        return resources.filter { $0.pathExtension.lowercased() == "tmx" }
-    }
-
-    public var tilesets: [URL] {
-        return resources.filter { $0.pathExtension.lowercased() == "tsx" }
-    }
-
-
-
-    /**
-     Add a new root path and scan.
-
-     - parameter path: `String` resource root path.
-     */
-    public func addRoot(url: URL) {
-        if !roots.contains(url) {
-            roots.append(url)
-            scanForResourceTypes()
-        }
-    }
-
-    /**
-     Scan root directories and return any matching resource files.
-     */
-    private func scanForResourceTypes() {
-        var resourcesAdded = 0
-
-        for root in roots {
-            print("  -> scanning: \(root.path)")
-            let urls = FileManager.default.listFiles(path: root.path, withExtensions: resourceTypes)
-            resources.append(contentsOf: urls)
-            resourcesAdded += urls.count
-        }
-
-        print("[AssetManager]: \(resourcesAdded) resources added.")
-    }
-}
-
-
-
-
-
-
-extension URL {
-    
-    /**
-     Returns the path file name without file extension.
-     */
-    var basename: String {
-        return self.deletingPathExtension().lastPathComponent
-    }
-
-    /**
-     Returns the file name without the parent directory.
-     */
-    var filename: String {
-        return self.lastPathComponent
-    }
-
-    /**
-     Returns the parent path of the file.
-     */
-    var parent: String? {
-        let mutableURL = self
-        let result = (mutableURL.deletingLastPathComponent().relativePath == ".") ? nil : mutableURL.deletingLastPathComponent().relativePath
-        return result
-    }
-
-    /**
-     Returns the path file name without file extension.
-     */
-    var fileExtension: String? {
-        return self.lastPathComponent.components(separatedBy: ".").last
-    }
-}
-*/

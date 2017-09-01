@@ -10,27 +10,39 @@ import UIKit
 import SpriteKit
 
 
-class GameViewController: UIViewController {
+class GameViewController: UIViewController, Loggable {
+
+    let demoController = DemoController.default
 
     @IBOutlet weak var mapInfoLabel: UILabel!
     @IBOutlet weak var tileInfoLabel: UILabel!
     @IBOutlet weak var propertiesInfoLabel: UILabel!
+    @IBOutlet weak var cameraInfoLabel: UILabel!
+    @IBOutlet weak var pauseInfoLabel: UILabel!
+    @IBOutlet weak var debugInfoLabel: UILabel!
+
+    @IBOutlet weak var objectsButton: UIButton!
     @IBOutlet weak var graphButton: UIButton!
 
-    let demoController = DemoController.default
-    var loggingLevel: LoggingLevel = .debug
+
+    @IBOutlet var demoFileAttributes: NSObject!
+    @IBOutlet weak var buttonsView: UIStackView!
+
+    var timer = Timer()
+    var loggingLevel: LoggingLevel = SKTiledLoggingLevel
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
         // Configure the view.
         let skView = self.view as! SKView
-        // set the controller view
+
+        // setup the controller
+        demoController.loggingLevel = loggingLevel
         demoController.view = skView
 
-
         guard let currentURL = demoController.currentURL else {
-            print("[GameViewController]: WARNING: no tilemap to load.")
+            log("no tilemap to load.", level: .warning)
             return
         }
 
@@ -41,25 +53,43 @@ class GameViewController: UIViewController {
         skView.showsPhysics = true
         #endif
 
-        /* Sprite Kit applies additional optimizations to improve rendering performance */
+
+        skView.showsFields = true
+        /* SpriteKit optimizations */
+        skView.shouldCullNonVisibleNodes = true
         skView.ignoresSiblingOrder = true
-        skView.showsPhysics = false
         setupDebuggingLabels()
 
 
-        /* create the game scene */
-        let scene = SKTiledDemoScene(size: self.view.bounds.size)
-        scene.scaleMode = .aspectFill
-        skView.presentScene(scene)
-        scene.setup(tmxFile: currentURL.relativePath, inDirectory: currentURL.baseURL?.relativePath, tilesets: [], verbosity: loggingLevel)
+        NotificationCenter.default.addObserver(self, selector: #selector(updateUIControls), name: NSNotification.Name(rawValue: "updateUIControls"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(updateDebugLabels), name: NSNotification.Name(rawValue: "updateDebugLabels"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(updateCommandString), name: NSNotification.Name(rawValue: "updateCommandString"), object: nil)
 
-        NotificationCenter.default.addObserver(self, selector: #selector(updateGraphControls), name: NSNotification.Name(rawValue: "updateGraphControls"), object: nil)
+        /* create the game scene */
+        demoController.loadScene(url: currentURL, usePreviousCamera: false)
+    }
+
+    override func viewDidLayoutSubviews() {
+        // Pause the scene while the window resizes if the game is active.
+
+        let skView = self.view as! SKView
+        if let scene = skView.scene {
+
+            if let sceneDelegate = scene as? SKTiledSceneDelegate {
+                if let cameraNode = sceneDelegate.cameraNode {
+                    cameraNode.bounds = skView.bounds
+                }
+            }
+        }
     }
 
     func setupDebuggingLabels() {
         mapInfoLabel.text = "Map: "
         tileInfoLabel.text = "Tile: "
         propertiesInfoLabel.text = "Properties:"
+        cameraInfoLabel.text = "Camera:"
+        pauseInfoLabel.text = "-"
+        debugInfoLabel.text = "-"
 
         let shadowColor = SKColor(white: 0.1, alpha: 0.65)
         let shadowOffset = CGSize(width: 1, height: 1)
@@ -73,6 +103,12 @@ class GameViewController: UIViewController {
         propertiesInfoLabel.shadowColor = shadowColor
         propertiesInfoLabel.shadowOffset = shadowOffset
 
+        cameraInfoLabel.shadowColor = shadowColor
+        cameraInfoLabel.shadowOffset = shadowOffset
+
+        pauseInfoLabel.shadowColor = shadowColor
+        pauseInfoLabel.shadowOffset = shadowOffset
+        debugInfoLabel.shadowOffset = shadowOffset
     }
 
     /**
@@ -90,7 +126,7 @@ class GameViewController: UIViewController {
      - parameter sender: `Any` ui button.
      */
     @IBAction func gridButtonPressed(_ sender: Any) {
-        self.demoController.toggleMapDemoDraw()
+        self.demoController.toggleMapDemoDrawGridBounds()
     }
 
     /**
@@ -127,7 +163,8 @@ class GameViewController: UIViewController {
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
         if UIDevice.current.userInterfaceIdiom == .phone {
-            return .landscapeRight
+            //return .landscape
+            return .all
         } else {
             return .all
         }
@@ -147,7 +184,7 @@ class GameViewController: UIViewController {
 
      - parameter notification: `Notification` notification.
      */
-    func updateDebugLabels(notification: Notification) {
+    @objc func updateDebugLabels(notification: Notification) {
         if let mapInfo = notification.userInfo!["mapInfo"] {
             mapInfoLabel.text = mapInfo as? String
         }
@@ -156,14 +193,126 @@ class GameViewController: UIViewController {
             tileInfoLabel.text = tileInfo as? String
         }
 
+        var propertiesDefaultText = "  "
         if let propertiesInfo = notification.userInfo!["propertiesInfo"] {
-            propertiesInfoLabel.text = propertiesInfo as? String
+            if let pinfo = propertiesInfo as? String {
+                if (pinfo.characters.isEmpty == false) {
+                    propertiesDefaultText = pinfo
+                }
+            }
+        }
+
+        if let cameraInfo = notification.userInfo!["cameraInfo"] {
+            cameraInfoLabel.text = cameraInfo as? String
+        }
+
+        if let pauseInfo = notification.userInfo!["pauseInfo"] {
+            pauseInfoLabel.text = pauseInfo as? String
+        }
+
+        propertiesInfoLabel.text = propertiesDefaultText
+    }
+
+    /**
+     Update the the command string label.
+
+     - parameter notification: `Notification` notification.
+     */
+    @objc func updateCommandString(notification: Notification) {
+        var duration: TimeInterval = 3.0
+
+        if let commandDuration = notification.userInfo!["duration"] {
+            duration = commandDuration as! TimeInterval
+        }
+
+
+        if let commandString = notification.userInfo!["command"] {
+            var commandFormatted = commandString as! String
+            commandFormatted = "\(commandFormatted)".uppercaseFirst
+
+            debugInfoLabel.fadeInThenOut(change: {
+                self.debugInfoLabel.text = "▹ \(commandFormatted)"
+
+            }, delay: duration)
         }
     }
 
-    func updateGraphControls(notification: Notification) {
+    /**
+     Reset the command string label.
+     */
+    func resetCommandLabel() {
+        timer.invalidate()
+        debugInfoLabel.setTextValue(" ", animated: true, interval: 0.5)
+    }
+
+    /**
+     Enables/disable button controls based on the current map attributes.
+
+     - parameter notification: `Notification` notification.
+     */
+    @objc func updateUIControls(notification: Notification) {
         if let hasGraphs = notification.userInfo!["hasGraphs"] {
             graphButton.isEnabled = (hasGraphs as? Bool) == true
+        }
+
+        if let hasObjects = notification.userInfo!["hasObjects"] {
+            objectsButton.isEnabled = (hasObjects as? Bool) == true
+        }
+    }
+}
+
+
+extension UILabel {
+    /**
+     Set the string value of the text field, with optional animated fade.
+
+     - parameter newValue: `String` new text value.
+     - parameter animated: `Bool` enable fade out effect.
+     - parameter interval: `TimeInterval` effect length.
+     */
+    func setTextValue(_ newValue: String, animated: Bool = true, interval: TimeInterval = 0.7) {
+        guard text != newValue else { return }
+        if animated {
+            animate(change: { self.text = newValue }, interval: interval)
+        } else {
+            text = newValue
+        }
+    }
+
+    /**
+     Private function to animate a fade effect.
+
+     - parameter change: `() -> ()` closure.
+     - parameter interval: `TimeInterval` effect length.
+     */
+    private func animate(change: @escaping () -> Void, interval: TimeInterval) {
+        UIView.animate(withDuration: interval, delay: 0.0, options: UIViewAnimationOptions.curveEaseOut, animations: {
+            self.alpha = 1.0
+        }, completion: { (Bool) -> Void in
+            change()
+            UIView.animate(withDuration: interval, delay: 0.0, options: UIViewAnimationOptions.curveEaseOut, animations: {
+                self.alpha = 0.0
+            }, completion: nil)
+
+        })
+    }
+
+    func fadeInThenOut(change: @escaping () -> Void, delay: TimeInterval) {
+        let animationDuration = 0.5
+
+        // Fade in the view
+        UIView.animate(withDuration: 0, animations: { () -> Void in
+            self.alpha = 1
+
+        }) { (Bool) -> Void in
+
+            // After the animation completes, fade out the view after a delay
+            change()
+
+            UIView.animate(withDuration: animationDuration, delay: delay, options: [.curveEaseOut], animations: { () -> Void in
+                self.alpha = 0
+                self.text = ""
+            }, completion: nil)
         }
     }
 }
