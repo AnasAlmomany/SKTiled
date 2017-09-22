@@ -24,7 +24,7 @@ class GameViewController: NSViewController, Loggable {
     @IBOutlet weak var cameraInfoLabel: NSTextField!
     @IBOutlet weak var pauseInfoLabel: NSTextField!
     @IBOutlet weak var isolatedInfoLabel: NSTextField!
-
+    @IBOutlet weak var coordinateInfoLabel: NSTextField!
 
     @IBOutlet weak var graphButton: NSButton!
     @IBOutlet weak var objectsButton: NSButton!
@@ -61,7 +61,7 @@ class GameViewController: NSViewController, Loggable {
         skView.showsFPS = true
         skView.showsNodeCount = true
         skView.showsDrawCount = true
-        skView.showsPhysics = true
+        skView.showsPhysics = false
         //debugInfoLabel?.isHidden = false
         #endif
 
@@ -96,6 +96,7 @@ class GameViewController: NSViewController, Loggable {
         cameraInfoLabel.stringValue = "--"
         debugInfoLabel.stringValue = ""
         isolatedInfoLabel.stringValue = ""
+        coordinateInfoLabel.stringValue = ""
 
         // text shadow
         let shadow = NSShadow()
@@ -110,6 +111,7 @@ class GameViewController: NSViewController, Loggable {
         cameraInfoLabel.shadow = shadow
         pauseInfoLabel.shadow = shadow
         isolatedInfoLabel.shadow = shadow
+        coordinateInfoLabel.shadow = shadow
     }
 
     /**
@@ -214,9 +216,11 @@ class GameViewController: NSViewController, Loggable {
 
     /**
      Update the debugging labels with scene information.
+
      - parameter notification: `Notification` notification.
      */
     @objc func updateDebugLabels(notification: Notification) {
+        //coordinateInfoLabel.isHidden = true
         if let mapInfo = notification.userInfo!["mapInfo"] {
             mapInfoLabel.stringValue = mapInfo as! String
         }
@@ -239,6 +243,11 @@ class GameViewController: NSViewController, Loggable {
 
         if let isolatedInfo = notification.userInfo!["isolatedInfo"] {
             isolatedInfoLabel.stringValue = isolatedInfo as! String
+        }
+
+        if let coordinateInfo = notification.userInfo!["coordinateInfo"] {
+            coordinateInfoLabel.stringValue = coordinateInfo as! String
+            //coordinateInfoLabel.isHidden = false
         }
     }
 

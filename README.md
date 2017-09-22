@@ -1,8 +1,9 @@
 ![SKTiled][header-image]
 
-> SKTiled is a Swift framework for using [Tiled](http://www.mapeditor.org) content with Apple's SpriteKit.
+> SKTiled is a Swift framework for using [Tiled][tiled-url] assets with Apple's SpriteKit.
 
-[![Swift Version][swift-image]][swift-url]
+[![Swift Version][swift4-image]][swift-url]
+[![Xcode Version][xcode9-image]][xcode-downloads-url]
 [![Build Status][travis-image]][travis-url]
 [![License][license-image]][license-url]
 [![Platforms][platforms-image]][platforms-url]
@@ -10,11 +11,16 @@
 [![CocoaPods Compatible][pod-image]][pod-url]
 
 
-**SKTiled** is a Swift framework for using [Tiled](http://www.mapeditor.org) content with [Apple's SpriteKit][spritekit-url], allowing the creation of game assets from Tiled's .tmx files. Inspired by [TilemapKit](http://tilemapkit.com) and written purely in Swift, I began working on this after the development of TilemapKit was halted, primarily to learn Apple's new programming language. I've decided to open-source it in case others find it helpful.
+**SKTiled** is a framework for using [Tiled][tiled-url] assets with [Apple's SpriteKit][spritekit-url], built from the ground up with Swift. This project began life as an exercise to learn Apple's new programming language for a game project, but I've decided to release it as open source with the hopes that others will find it useful. **SKTiled** is up-to-date and supports **Tiled's** major features, including all map & object types.
 
 
+![Demo Image][demo-iphone-img]
 
-![Demo Image][demo-image]
+
+This branch is for **Xcode 9 & Swift 4.0**.
+
+- for Xcode 9 & Swift 3.2, see the [**master**][branch-master-url] branch
+- for Xcode 8 & Swift 3.2, see the [**xcode8**][branch-xcode8-url] branch
 
 
 Check out the [Official Documentation](https://mfessenden.github.io/SKTiled).
@@ -33,6 +39,7 @@ Check out the [Official Documentation](https://mfessenden.github.io/SKTiled).
 - [x] group nodes
 - [x] tile objects
 - [x] text objects
+- [ ] tile collision objects
 - [x] custom tile & object classes
 - [x] generate GKGridGraph graphs from custom attributes
 - [x] user-definable cost properties for GKGridGraph nodes
@@ -41,8 +48,8 @@ Check out the [Official Documentation](https://mfessenden.github.io/SKTiled).
 ## Requirements
 
 - iOS 9+
-- macOS 10.11+
-- Xcode 8+
+- macOS 10.12+
+- Xcode 9/Swift 4.0
 
 ## Installation
 
@@ -50,12 +57,13 @@ Check out the [Official Documentation](https://mfessenden.github.io/SKTiled).
 
 For Carthage installation, create a Cartfile in the root of your project:
 
-    github "mfessenden/SKTiled" ~> 1.15
+    github "mfessenden/SKTiled" "swift4"
 
 
 For CocoaPods, install via a reference in your podfile:
 
-    pod 'SKTiled', '~> 1.15'
+    pod 'SKTiled', :git => 'https://github.com/mfessenden/SKTiled.git', :branch => 'swift4'
+
 
 
 ## Usage
@@ -197,7 +205,7 @@ let roadRoot = SKNode()
 groundLayer.addChild(roadRoot, 4, 5, zpos: 100.0)
 ```
 
-**SKTiled** also provides methods for getting coordinate data from `UITouch` and `NSEvent` mouse events:
+**SKTiled** also provides methods for getting coordinate data from [`UITouch`][uitouch-url] and [`NSEvent`][nsevent-url] mouse events:
 
 ```swift
 // get the coordinate at the location of a touch event
@@ -206,15 +214,21 @@ let touchLocation: CGPoint = objectsLayer.coordinateAtTouchLocation(touch)
 
 ## Animated Tiles
 
-Tiles with animation will animate automatically; animated tiles can be accesssed from the either the [`SKTilemap`][sktilemap-url] node or the parent layer. The `SKTile.pauseAnimation` property can stop/start animations:
+Tiles with animation will animate automatically when the tilemap node is added to the [`SKScene.update`][skscene-update-url] method. Animated tiles can be accesssed from the either the [`SKTilemap`][sktilemap-url] node or the parent layer.
+
 
 ```swift
 // get all animated tiles, including nested layers
 let allAnimated = tilemap.animatedTiles(recursive: true)
 
+// pause/unpause tile animation
 for tile in allAnimated {
-    // pause the current animation
-    tile.pauseAnimation = true
+    tile.isPaused = true
+}
+
+// run animation backwards
+for tile in allAnimated {
+    tile.speed = -1.0
 }
 
 // get animated tiles from individual layers
@@ -257,7 +271,8 @@ let allWalkable = tilemap.getTilesWithProperty("walkable", true")
 - [Clint Bellanger: Isometric Tiles Math](http://clintbellanger.net/articles/isometric_math)
 
 
-[swift-image]:https://img.shields.io/badge/Swift-4-brightgreen.svg
+[swift4-image]:https://img.shields.io/badge/Swift-4-brightgreen.svg
+[swift-image]:https://img.shields.io/badge/Swift-3.2-brightgreen.svg
 [swift-url]: https://swift.org/
 [license-image]:https://img.shields.io/badge/License-MIT-blue.svg
 [license-url]:https://github.com/mfessenden/SKTiled/blob/master/LICENSE
@@ -268,10 +283,21 @@ let allWalkable = tilemap.getTilesWithProperty("walkable", true")
 [carthage-image]:https://img.shields.io/badge/Carthage-compatible-4BC51D.svg
 [carthage-url]:https://github.com/Carthage/Carthage
 [pod-image]:https://img.shields.io/cocoapods/v/SKTiled.svg
+
+[xcode8-image]:https://img.shields.io/badge/Xcode-8-orange.svg
+[xcode9-image]:https://img.shields.io/badge/Xcode-9-orange.svg
+[xcode-downloads-url]:https://developer.apple.com/download/more/
+
 [pod-url]:https://cocoapods.org/pods/SKTiled
-[swift4-url]:https://github.com/mfessenden/SKTiled/tree/swift4
+
+[branch-master-url]:https://github.com/mfessenden/SKTiled
+[branch-xcode8-url]:https://github.com/mfessenden/SKTiled/tree/xcode8
+[branch-swift4-url]:https://github.com/mfessenden/SKTiled/tree/swift4
+
 [header-image]:https://mfessenden.github.io/SKTiled/images/Header-@1x.png
-[demo-image]:https://mfessenden.github.io/SKTiled/images/images/demo-macos-iso.png
+[demo-mac-image]:https://mfessenden.github.io/SKTiled/images/demo-macos-iso.png
+[demo-iphone-img]:https://mfessenden.github.io/SKTiled/images/demo-iphone.png
+
 
 <!--- Documentation --->
 
@@ -287,6 +313,7 @@ let allWalkable = tilemap.getTilesWithProperty("walkable", true")
 [sktileset-url]:https://mfessenden.github.io/SKTiled/Classes/SKTileset.html
 
 <!--- Tiled --->
+[tiled-url]:http://www.mapeditor.org
 [group-layers-url]:http://doc.mapeditor.org/manual/layers/#group-layers
 
 <!--- Apple --->
@@ -295,3 +322,6 @@ let allWalkable = tilemap.getTilesWithProperty("walkable", true")
 [sknode-url]:https://developer.apple.com/documentation/spritekit/sknode
 [skspritenode-url]:https://developer.apple.com/documentation/spritekit/skspritenode
 [skscene-url]:https://developer.apple.com/documentation/spritekit/skscene
+[skscene-update-url]:https://developer.apple.com/documentation/spritekit/skscene/1519802-update
+[uitouch-url]:https://developer.apple.com/documentation/uikit/uitouch
+[nsevent-url]:https://developer.apple.com/documentation/appkit/nsevent

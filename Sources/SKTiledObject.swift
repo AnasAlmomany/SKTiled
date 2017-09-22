@@ -57,6 +57,7 @@ import SpriteKit
 
 public extension SKTiledObject {
 
+
     public var hashValue: Int { return uuid.hashValue }
 
     // MARK: - Properties Parsing

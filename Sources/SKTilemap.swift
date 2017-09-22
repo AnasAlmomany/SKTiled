@@ -220,6 +220,14 @@ public class SKTilemap: SKNode, SKTiledObject, Loggable {
         }
     }
 
+    // Set the speed of child layers
+    override public var speed: CGFloat {
+        didSet {
+            guard oldValue != speed else { return }
+            self.layers.forEach {$0.speed = speed}
+        }
+    }
+
     // hexagonal
     public var hexsidelength: Int = 0                               // hexagonal side length
     internal var staggeraxis: StaggerAxis = .y                      // stagger axis
@@ -228,7 +236,7 @@ public class SKTilemap: SKNode, SKTiledObject, Loggable {
     // camera/scene
     public var bounds: CGRect = .zero                               // current bounds
     public var worldScale: CGFloat = 1.0                            // initial world scale
-    public var currentZoom: CGFloat = 1.0
+    public var currentZoom: CGFloat = 1.0                           // zoom level
 
     /// Allow camera zoom.
     public var allowZoom: Bool = true
@@ -320,7 +328,7 @@ public class SKTilemap: SKNode, SKTiledObject, Loggable {
     public var gridColor: SKColor = TiledObjectColors.obsidian          // color used to visualize the tile grid
     public var frameColor: SKColor = TiledObjectColors.obsidian         // bounding box color
     public var highlightColor: SKColor = TiledObjectColors.lime         // color used to highlight tiles
-
+    public var navigationColor: SKColor = TiledObjectColors.lime        // navigation graph color.
     internal var autoResize: Bool = false                               // indicates map should auto-resize when view changes
 
     /// dynamics
@@ -706,6 +714,16 @@ public class SKTilemap: SKNode, SKTiledObject, Loggable {
      */
     public func pointForCoordinate(coord: CGPoint, offsetX: CGFloat=0, offsetY: CGFloat=0) -> CGPoint {
         return defaultLayer.pointForCoordinate(coord: coord, offsetX: offsetX, offsetY: offsetY)
+    }
+
+    /**
+     Returns a tile coordinate for a given vector_int2 coordinate.
+
+     - parameter vec2: `int2` vector int2 coordinate.
+     - returns: `CGPoint` position in layer.
+     */
+    public func pointForCoordinate(vec2: int2) -> CGPoint {
+        return defaultLayer.pointForCoordinate(vec2: vec2)
     }
 
     /**
@@ -1474,6 +1492,7 @@ public class SKTilemap: SKNode, SKTiledObject, Loggable {
     }
     #endif
 
+    #if os(macOS)
     /**
      Returns a mouse event location in the default layer. (negative-y space).
 
@@ -1482,7 +1501,6 @@ public class SKTilemap: SKNode, SKTiledObject, Loggable {
      - parameter point: `CGPoint` scene point.
      - returns: `CGPoint` converted point in layer coordinate system.
      */
-    #if os(OSX)
     public func mouseLocation(event: NSEvent) -> CGPoint {
         return defaultLayer.mouseLocation(event: event)
     }
@@ -1525,12 +1543,15 @@ public class SKTilemap: SKNode, SKTiledObject, Loggable {
         defer {
             self.delegate?.didRenderMap(self)
         }
+
+        // clamp the position of the map & parent nodes
+        clampPositionWithNode(node: self, scale: getContentScaleFactor())
     }
 
     // MARK: - Updating
 
     /**
-     Called before each frame is rendered.
+     Update the map as each frame is rendered.
 
      - parameter currentTime: `TimeInterval` update interval.
      */
@@ -1548,7 +1569,7 @@ public class SKTilemap: SKNode, SKTiledObject, Loggable {
 
         // Update layers
         self.layers.forEach { layer in
-            layer.update(currentTime)
+            layer.update(dt)
         }
     }
 }
@@ -1962,16 +1983,23 @@ extension SKTilemapDelegate {
 }
 
 
-// TODO: - Expand these to fascilitate clamping.
+/* Clamp position of the map & parents when camera changes happen. */
 extension SKTilemap: SKTiledSceneCameraDelegate {
 
     public func cameraBoundsChanged(bounds: CGRect, position: CGPoint, zoom: CGFloat) {}
-    public func cameraPositionChanged(newPosition: CGPoint) {}
+
+    public func cameraPositionChanged(newPosition: CGPoint) {
+        // clamp the position of the map & parent nodes
+        clampPositionWithNode(node: self, scale: getContentScaleFactor())
+    }
 
     public func cameraZoomChanged(newZoom: CGFloat) {
         //let oldZoom = currentZoom
         currentZoom = newZoom
         antialiasLines = (newZoom < 1)
+
+        // clamp the position of the map & parent nodes
+        clampPositionWithNode(node: self, scale: getContentScaleFactor())
     }
 
     #if os(iOS) || os(tvOS)
@@ -2010,11 +2038,9 @@ extension SKTilemap: SKTiledSceneCameraDelegate {
 
 extension TiledObjectColors {
 
-
     static let all: [SKColor] = [coral, crimson, english, saffron,
                                  tangerine, dandelion, azure, turquoise,
                                  lime, pear, grass, indigo, metal, gun]
-
     /// Returns a random color.
     static var random: SKColor {
         let randIndex = Int(arc4random_uniform(UInt32(TiledObjectColors.all.count)))

@@ -1,15 +1,34 @@
 Change Log
 ==========
 
+1.16
+-----
+
+#### Changes
+
+- add functions to alleviate tile seams, or "cracking"
+- tile animations no longer driven by `SKAction`
+    - changing `SKTilemap` speed will affect child layers
+    - tile animations will respond to `SKTilemap` speed changes, and even run backwards
+- add `SKTiledSceneCamera.setCameraBounds(bounds:)`
+- add `SKTileset.getAnimatedTileData`
+- add `SKTileset.renderTileData`
+- add `SKTilesetData.frameAt(index:)`
+- add `SKTilesetData.setTexture(_:forFrame:)`
+- add `SKTilesetData.setDuration(interval:forFrame:)`
+- add `SKTileObject.tileData` property
+- add `SKTiledSceneCamera.clampZoomValue`
+- add `SKTiledSceneCamera.zoomClamping` property
+- remove `SKTile.pauseAnimation`
+
+
 1.15
 -----
 
 #### Changes
 
 - invert layer y-offsets properly
-- add `DemoController` to manage scenes in iOS/macOS
-
-
+- add `DemoController` to manage scenes in iOS/macOS demo targets
 - add `SKTilemap.getLayer(atPath:)`
 - add `SKTilemapDelegate.didAddNavigationGraph(_:)`
 - add `SKTilemap.newTileLayer(named:group:)`
@@ -52,8 +71,6 @@ Change Log
 - update API for new layer & object types, more consistent naming, etc.
 - improved grid drawing quality
 - debug functions moved to `SKTiled+Debug.swift`
-
-
 - add `SKObjectGroup.textObjects`
 - add `SKTilemap.textObjects`
 - add `SKTilemap.showGrid`
